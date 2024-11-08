@@ -74,9 +74,12 @@ func TestTrack(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			log := tlog.NewTestLogger(t)
-			ctx := logr.NewContext(context.Background(), log)
-			ctx, cancel := context.WithCancel(ctx)
+			ctx, cancel := context.WithCancel(context.TODO())
+			go func() {
+				time.Sleep(2 * time.Second)
+				cancel()
+			}()
+			Track(ctx, ociClient, router, tt.resolveLatestTag)
 
 			router := routing.NewMemoryRouter(map[string][]netip.AddrPort{}, netip.MustParseAddrPort("127.0.0.1:5000"))
 			g, gCtx := errgroup.WithContext(ctx)
