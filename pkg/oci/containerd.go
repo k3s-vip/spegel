@@ -126,11 +126,15 @@ func (c *Containerd) Verify(ctx context.Context) error {
 }
 
 func canVerifyContainerdConfiguration(version string) (bool, error) {
-	v, err := utilversion.Parse(version)
-	if err != nil {
-		return false, err
+	semanticVer, semErr := utilversion.ParseSemantic(version)
+	if semErr == nil {
+		return semanticVer.LessThan(utilversion.MustParseSemantic("2.0")), nil
 	}
-	return v.LessThan(utilversion.MustParse("2.0")), nil
+	genericVer, genErr := utilversion.ParseGeneric(version)
+	if genErr == nil {
+		return genericVer.LessThan(utilversion.MustParseGeneric("2.0")), nil
+	}
+	return false, fmt.Errorf("invalid version format: %q (semantic error: %v, generic error: %v)", version, semErr, genErr)
 }
 
 func verifyStatusResponse(resp *runtimeapi.StatusResponse, configPath string) error {

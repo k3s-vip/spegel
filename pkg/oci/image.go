@@ -38,7 +38,14 @@ func NewImage(registry, repository, tag string, dgst digest.Digest) (Image, erro
 }
 
 func (i Image) IsLatestTag() bool {
-	return i.Tag == "latest"
+	isLetter := true
+	for _, char := range i.Tag {
+		if (char < 'A' || char > 'Z') && (char < 'a' || char > 'z') {
+			isLetter = false
+			break
+		}
+	}
+	return isLetter
 }
 
 func (i Image) String() string {
