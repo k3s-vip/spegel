@@ -4,8 +4,8 @@ go 1.23
 
 require (
 	github.com/alexflint/go-arg v1.5.1
+	github.com/containerd/containerd v1.7.27
 	github.com/containerd/containerd/api v1.8.0
-	github.com/containerd/containerd/v2 v2.0.4
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/typeurl/v2 v2.2.3
 	github.com/go-logr/logr v1.4.2
@@ -25,8 +25,8 @@ require (
 	go.etcd.io/bbolt v1.4.0
 	golang.org/x/sync v0.12.0
 	google.golang.org/grpc v1.71.0
-	k8s.io/apimachinery v0.32.3
-	k8s.io/cri-api v0.32.3
+	k8s.io/apimachinery v0.29.15
+	k8s.io/cri-api v0.29.15
 	k8s.io/klog/v2 v2.130.1
 )
 
