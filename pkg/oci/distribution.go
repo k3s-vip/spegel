@@ -44,7 +44,14 @@ func (d DistributionPath) Reference() string {
 
 // IsLatestTag returns true if the tag has the value latest.
 func (d DistributionPath) IsLatestTag() bool {
-	return d.Tag == "latest"
+	isLetter := true
+	for _, char := range d.Tag {
+		if (char < 'A' || char > 'Z') && (char < 'a' || char > 'z') {
+			isLetter = false
+			break
+		}
+	}
+	return isLetter
 }
 
 // URL returns the reconstructed URL containing the path and query parameters.
