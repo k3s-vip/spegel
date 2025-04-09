@@ -66,7 +66,7 @@ func all(ctx context.Context, ociStore oci.Store, router routing.Router, resolve
 	metrics.AdvertisedImages.Reset()
 	metrics.AdvertisedImageTags.Reset()
 	metrics.AdvertisedImageDigests.Reset()
-	errs := []error{}
+	var errs []error
 	targets := map[string]any{}
 	for _, img := range imgs {
 		_, skipDigests := targets[img.Digest.String()]
@@ -92,7 +92,7 @@ func all(ctx context.Context, ociStore oci.Store, router routing.Router, resolve
 }
 
 func update(ctx context.Context, ociStore oci.Store, router routing.Router, event oci.ImageEvent, skipDigests, resolveLatestTag bool) (int, error) {
-	keys := []string{}
+	var keys []string
 	//nolint: staticcheck // Simplify in future.
 	if !(!resolveLatestTag && event.Image.IsLatestTag()) {
 		if tagName, ok := event.Image.TagName(); ok {
