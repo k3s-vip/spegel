@@ -1,10 +1,10 @@
 image:
   # -- Image repository.
-  repository: ghcr.io/spegel-org/spegel
+  repository: muicoder/spegel
   # -- Image Pull Policy.
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   # -- Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: "stable"
   # -- Image digest.
   digest: ""
 
@@ -161,9 +161,9 @@ spegel:
   # -- When true latest tags will be resolved to digests.
   resolveLatestTag: true
   # -- When true existing mirror configuration will be kept and Spegel will prepend it's configuration.
-  prependExisting: false
+  prependExisting: true
   # -- When true enables debug web page.
-  debugWebEnabled: false
+  debugWebEnabled: true
 
 verticalPodAutoscaler:
   # -- If true creates a Vertical Pod Autoscaler.

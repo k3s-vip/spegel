@@ -126,11 +126,15 @@ func (c *Containerd) Verify(ctx context.Context) error {
 }
 
 func canVerifyContainerdConfiguration(version string) (bool, error) {
-	v, err := utilversion.Parse(version)
-	if err != nil {
-		return false, err
+	semanticVer, semErr := utilversion.ParseSemantic(version)
+	if semErr == nil {
+		return semanticVer.LessThan(utilversion.MustParseSemantic("2.0")), nil
 	}
-	return v.LessThan(utilversion.MustParse("2.0")), nil
+	genericVer, genErr := utilversion.ParseGeneric(version)
+	if genErr == nil {
+		return genericVer.LessThan(utilversion.MustParseGeneric("2.0")), nil
+	}
+	return false, fmt.Errorf("invalid version format: %q (semantic error: %v, generic error: %v)", version, semErr, genErr)
 }
 
 func verifyStatusResponse(resp *runtimeapi.StatusResponse, configPath string) error {
@@ -154,22 +158,22 @@ func verifyStatusResponse(resp *runtimeapi.StatusResponse, configPath string) er
 		return errors.New("field containerd.discardUnpackedLayers missing from config")
 	}
 	if *cfg.Containerd.DiscardUnpackedLayers {
-		return errors.New("Containerd discard unpacked layers cannot be enabled")
+		return errors.New("containerd discard unpacked layers cannot be enabled")
 	}
 	if cfg.Registry.ConfigPath == nil {
 		return errors.New("field registry.configPath missing from config")
 	}
 	if *cfg.Registry.ConfigPath == "" {
-		return errors.New("Containerd registry config path needs to be set for mirror configuration to take effect")
+		return errors.New("containerd registry config path needs to be set for mirror configuration to take effect")
 	}
 	paths := filepath.SplitList(*cfg.Registry.ConfigPath)
-	for _, path := range paths {
-		if path != configPath {
+	for _, pathConfig := range paths {
+		if pathConfig != configPath {
 			continue
 		}
 		return nil
 	}
-	return fmt.Errorf("Containerd registry config path is %s but needs to contain path %s for mirror configuration to take effect", *cfg.Registry.ConfigPath, configPath)
+	return fmt.Errorf("containerd registry config path is %s but needs to contain path %s for mirror configuration to take effect", *cfg.Registry.ConfigPath, configPath)
 }
 
 func (c *Containerd) Subscribe(ctx context.Context) (<-chan ImageEvent, <-chan error, error) {
@@ -229,7 +233,7 @@ func (c *Containerd) ListImages(ctx context.Context) ([]Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	imgs := []Image{}
+	var imgs []Image
 	for _, cImg := range cImgs {
 		img, err := ParseImageRequireDigest(cImg.Name(), cImg.Target().Digest)
 		if err != nil {
@@ -288,8 +292,8 @@ func (c *Containerd) GetManifest(ctx context.Context, dgst digest.Digest) ([]byt
 
 func (c *Containerd) GetBlob(ctx context.Context, dgst digest.Digest) (io.ReadSeekCloser, error) {
 	if c.contentPath != "" {
-		path := filepath.Join(c.contentPath, "blobs", dgst.Algorithm().String(), dgst.Encoded())
-		file, err := os.Open(path)
+		blobsPath := filepath.Join(c.contentPath, "blobs", dgst.Algorithm().String(), dgst.Encoded())
+		file, err := os.Open(blobsPath)
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, errors.Join(ErrNotFound, err)
 		}
@@ -339,7 +343,7 @@ func getEventImage(e typeurl.Any) (string, EventType, error) {
 }
 
 func createFilters(mirroredRegistries []url.URL) (string, string) {
-	registryHosts := []string{}
+	var registryHosts []string
 	for _, registry := range mirroredRegistries {
 		registryHosts = append(registryHosts, strings.ReplaceAll(registry.Host, `.`, `\\.`))
 	}
@@ -353,7 +357,7 @@ func createFilters(mirroredRegistries []url.URL) (string, string) {
 	return listFilter, eventFilter
 }
 
-// Refer to containerd registry configuration documentation for more information about required configuration.
+// AddMirrorConfiguration Refer to containerd registry configuration documentation for more information about required configuration.
 // https://github.com/containerd/containerd/blob/main/docs/cri/config.md#registry-configuration
 // https://github.com/containerd/containerd/blob/main/docs/hosts.md#registry-configuration---examples
 func AddMirrorConfiguration(ctx context.Context, fs afero.Fs, configPath string, mirroredRegistries, mirrorTargets []url.URL, resolveTags, prependExisting bool, username, password string) error {
@@ -462,7 +466,7 @@ func CleanupMirrorConfiguration(ctx context.Context, fs afero.Fs, configPath str
 }
 
 func validateRegistries(urls []url.URL) error {
-	errs := []error{}
+	var errs []error
 	for _, u := range urls {
 		if u.Scheme != "http" && u.Scheme != "https" {
 			errs = append(errs, fmt.Errorf("invalid registry url scheme must be http or https: %s", u.String()))
@@ -595,7 +599,7 @@ func existingHosts(fs afero.Fs, configPath string, mirroredRegistry url.URL) (st
 		return "", nil
 	}
 
-	hosts := []string{}
+	var hosts []string
 	parser := tomlu.Parser{}
 	parser.Reset(b)
 	for parser.NextExpression() {
@@ -613,7 +617,7 @@ func existingHosts(fs afero.Fs, configPath string, mirroredRegistry url.URL) (st
 		}
 	}
 
-	ehs := []string{}
+	var ehs []string
 	for _, h := range hosts {
 		data := hostFile{
 			Hosts: map[string]any{
