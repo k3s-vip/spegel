@@ -113,7 +113,7 @@ func tick(ctx context.Context, ociStore oci.Store, router routing.Router, resolv
 }
 
 func update(ctx context.Context, ociStore oci.Store, router routing.Router, event oci.ImageEvent, skipDigests, resolveLatestTag bool) (int, error) {
-	keys := []string{}
+	var keys []string
 	//nolint: staticcheck // Simplify in future.
 	if !(!resolveLatestTag && event.Image.IsLatestTag()) {
 		if tagName, ok := event.Image.TagName(); ok {
