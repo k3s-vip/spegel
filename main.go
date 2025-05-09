@@ -173,11 +173,7 @@ func registryCommand(ctx context.Context, args *RegistryCmd) (err error) {
 
 	// State tracking
 	g.Go(func() error {
-		err := state.Track(ctx, ociStore, router, args.ResolveLatestTag)
-		if err != nil {
-			return err
-		}
-		return nil
+		return state.Track(ctx, ociStore, router, args.ResolveLatestTag)
 	})
 
 	// Registry

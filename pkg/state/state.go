@@ -16,6 +16,19 @@ import (
 
 func Track(ctx context.Context, ociStore oci.Store, router routing.Router, resolveLatestTag bool) error {
 	log := logr.FromContextOrDiscard(ctx)
+	for {
+		err := track(ctx, ociStore, router, resolveLatestTag)
+		if err == nil || errors.Is(err, context.Canceled) {
+			log.V(5).Info("image state tracker stopped")
+			return nil
+		}
+		log.Error(err, "restarting image state tracker due to error")
+		time.Sleep(time.Second)
+	}
+}
+
+func track(ctx context.Context, ociStore oci.Store, router routing.Router, resolveLatestTag bool) error {
+	log := logr.FromContextOrDiscard(ctx)
 	eventCh, errCh, err := ociStore.Subscribe(ctx)
 	if err != nil {
 		return err
@@ -29,12 +42,11 @@ func Track(ctx context.Context, ociStore oci.Store, router routing.Router, resol
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return ctx.Err()
 		case <-tickerCh:
 			log.Info("running scheduled image state update")
 			if err := all(ctx, ociStore, router, resolveLatestTag); err != nil {
-				log.Error(err, "received errors when updating all images")
-				continue
+				return fmt.Errorf("received errors when updating all images: %w", err)
 			}
 		case event, ok := <-eventCh:
 			if !ok {
@@ -50,6 +62,7 @@ func Track(ctx context.Context, ociStore oci.Store, router routing.Router, resol
 				return errors.New("image error channel closed")
 			}
 			log.Error(err, "event channel error")
+			continue
 		}
 	}
 }
