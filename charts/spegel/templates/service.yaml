@@ -5,7 +5,6 @@ metadata:
   namespace: {{ include "spegel.namespace" . }}
   labels:
     app.kubernetes.io/component: metrics
-    {{- include "spegel.labels" . | nindent 4 }}
 spec:
   selector:
     {{- include "spegel.selectorLabels" . | nindent 4 }}
@@ -20,8 +19,6 @@ kind: Service
 metadata:
   name: {{ include "spegel.fullname" . }}-registry
   namespace: {{ include "spegel.namespace" . }}
-  labels:
-    {{- include "spegel.labels" . | nindent 4 }}
   {{- if .Values.service.registry.topologyAwareHintsEnabled }}
   annotations:
     service.kubernetes.io/topology-mode: "auto"
@@ -42,8 +39,6 @@ kind: Service
 metadata:
   name: {{ include "spegel.fullname" . }}-bootstrap
   namespace: {{ include "spegel.namespace" . }}
-  labels:
-    {{- include "spegel.labels" . | nindent 4 }}
 spec:
   selector:
     {{- include "spegel.selectorLabels" . | nindent 4 }}
