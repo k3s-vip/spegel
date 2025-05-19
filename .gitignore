@@ -19,6 +19,7 @@
 
 # Go workspace file
 go.work
+.idea
 
 # Added by goreleaser init:
 dist/
