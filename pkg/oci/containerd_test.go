@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/containerd/containerd/v2/pkg/filters"
+	"github.com/containerd/containerd/filters"
 	"github.com/go-logr/logr"
 	"github.com/stretchr/testify/require"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
