@@ -6,7 +6,6 @@ metadata:
   namespace: {{ include "spegel.namespace" . }}
   labels:
     app.kubernetes.io/component: cleanup
-    {{- include "spegel.labels" . | nindent 4 }}
   annotations:
     helm.sh/hook: "post-delete"
     helm.sh/hook-delete-policy: "before-hook-creation, hook-succeeded"
@@ -65,7 +64,6 @@ metadata:
   namespace: {{ include "spegel.namespace" . }}
   labels:
     app.kubernetes.io/component: cleanup
-    {{- include "spegel.labels" . | nindent 4 }}
   annotations:
     helm.sh/hook: "post-delete"
     helm.sh/hook-delete-policy: "before-hook-creation, hook-succeeded"
@@ -91,7 +89,6 @@ metadata:
   namespace: {{ include "spegel.namespace" . }}
   labels:
     app.kubernetes.io/component: cleanup-wait
-    {{- include "spegel.labels" . | nindent 4 }}
   annotations:
     helm.sh/hook: "post-delete"
     helm.sh/hook-delete-policy: "before-hook-creation, hook-succeeded"
