@@ -207,15 +207,15 @@ func (c *Containerd) Features(ctx context.Context) (Feature, error) {
 }
 
 func featuresForVersion(version string) (Feature, error) {
-	v, err := utilversion.Parse(version)
+	v, err := utilversion.ParseGeneric(version)
 	if err != nil {
 		return 0, fmt.Errorf("could not parse version %s: %w", version, err)
 	}
 	feats := Feature(0)
-	if v.LessThan(utilversion.MustParse("2.0")) {
+	if v.LessThan(utilversion.MustParseGeneric("2.0")) {
 		feats.Set(FeatureConfigCheck)
 	}
-	if v.AtLeast(utilversion.MustParse("2.1")) {
+	if v.AtLeast(utilversion.MustParseGeneric("2.1")) {
 		feats.Set(FeatureContentEvent)
 	}
 	return feats, nil
@@ -495,6 +495,10 @@ func parseContentRegistries(l map[string]string) []string {
 func createFilters(parsedMirroredRegistries []url.URL) ([]string, []string, []string) {
 	registryHosts := []string{}
 	for _, registry := range parsedMirroredRegistries {
+		if registry.Host == "*" || registry.Host == "_default" {
+			registryHosts = []string{".+"}
+			break
+		}
 		registryHosts = append(registryHosts, strings.ReplaceAll(registry.Host, `.`, `\\.`))
 	}
 	imageFilter := fmt.Sprintf(`name~="^(%s)/"`, strings.Join(registryHosts, "|"))

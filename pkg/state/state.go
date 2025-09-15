@@ -79,6 +79,7 @@ func Track(ctx context.Context, ociStore oci.Store, router routing.Router, opts 
 				log.Error(err, "received errors when updating all images")
 				continue
 			}
+			time.Sleep(time.Second)
 		case event, ok := <-eventCh:
 			if !ok {
 				return errors.New("event channel closed")
