@@ -16,12 +16,12 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/core/events"
-	"github.com/containerd/containerd/v2/pkg/filters"
-	"github.com/containerd/containerd/v2/pkg/labels"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/filters"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	"github.com/go-logr/logr"
@@ -32,7 +32,6 @@ import (
 	tomlu "github.com/pelletier/go-toml/v2/unstable"
 	"github.com/spegel-org/spegel/internal/option"
 	"github.com/spegel-org/spegel/pkg/httpx"
-	"google.golang.org/grpc"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -89,8 +88,8 @@ var _ Store = &Containerd{}
 type Containerd struct {
 	contentPath        string
 	registryConfigPath string
-	client             *client.Client
-	clientGetter       func() (*client.Client, error)
+	client             *containerd.Client
+	clientGetter       func() (*containerd.Client, error)
 	mtCache            *lru.Cache[digest.Digest, string]
 	features           *Feature
 	imageFilter        []string
@@ -118,8 +117,8 @@ func NewContainerd(sock, namespace, registryConfigPath string, mirroredRegistrie
 
 	c := &Containerd{
 		contentPath: cfg.ContentPath,
-		clientGetter: func() (*client.Client, error) {
-			return client.New(sock, client.WithDefaultNamespace(namespace))
+		clientGetter: func() (*containerd.Client, error) {
+			return containerd.New(sock, containerd.WithDefaultNamespace(namespace))
 		},
 		imageFilter:        imageFilter,
 		eventFilter:        eventFilter,
@@ -130,7 +129,7 @@ func NewContainerd(sock, namespace, registryConfigPath string, mirroredRegistrie
 	return c, nil
 }
 
-func (c *Containerd) Client() (*client.Client, error) {
+func (c *Containerd) Client() (*containerd.Client, error) {
 	var err error
 	if c.client == nil {
 		c.client, err = c.clientGetter()
@@ -164,11 +163,7 @@ func (c *Containerd) Verify(ctx context.Context) error {
 		log.Info("skipping verification of Containerd configuration")
 		return nil
 	}
-	grpcConn, ok := client.Conn().(*grpc.ClientConn)
-	if !ok {
-		return errors.New("client connection is not grpc")
-	}
-	srv := runtimeapi.NewRuntimeServiceClient(grpcConn)
+	srv := runtimeapi.NewRuntimeServiceClient(client.Conn())
 	statusResp, err := srv.Status(ctx, &runtimeapi.StatusRequest{Verbose: true})
 	if err != nil {
 		return err
@@ -190,11 +185,7 @@ func (c *Containerd) Features(ctx context.Context) (Feature, error) {
 	if err != nil {
 		return 0, err
 	}
-	grpcConn, ok := client.Conn().(*grpc.ClientConn)
-	if !ok {
-		return 0, errors.New("client connection is not grpc")
-	}
-	srv := runtimeapi.NewRuntimeServiceClient(grpcConn)
+	srv := runtimeapi.NewRuntimeServiceClient(client.Conn())
 	versionResp, err := srv.Version(ctx, &runtimeapi.VersionRequest{})
 	if err != nil {
 		return 0, err
