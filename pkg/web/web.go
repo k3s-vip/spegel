@@ -2,10 +2,12 @@ package web
 
 import (
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html"
 	"html/template"
+	"io"
 	"net"
 	"net/http"
 	"net/netip"
@@ -27,13 +29,40 @@ var templatesFS embed.FS
 
 type Web struct {
 	router          routing.Router
+	log             logr.Logger
 	ociClient       *oci.Client
 	httpClient      *http.Client
+	transport       http.RoundTripper
 	tmpls           *template.Template
 	registryAddress string
+	image           []oci.Image
+	imageIndex      int
 }
 
-func NewWeb(router routing.Router, ociClient *oci.Client, registryAddr string) (*Web, error) {
+type WebOption func(*Web) error
+
+func WithLogger(log logr.Logger) WebOption {
+	return func(w *Web) error {
+		w.log = log
+		return nil
+	}
+}
+
+func WithTransport(transport http.RoundTripper) WebOption {
+	return func(w *Web) error {
+		w.transport = transport
+		return nil
+	}
+}
+
+func WithAddress(addr string) WebOption {
+	return func(w *Web) error {
+		w.registryAddress = addr
+		return nil
+	}
+}
+
+func NewWeb(router routing.Router, opts ...WebOption) (*Web, error) {
 	funcs := template.FuncMap{
 		"formatBytes":    formatBytes,
 		"formatDuration": formatDuration,
@@ -42,17 +71,35 @@ func NewWeb(router routing.Router, ociClient *oci.Client, registryAddr string) (
 	if err != nil {
 		return nil, err
 	}
-	return &Web{
-		router:          router,
-		ociClient:       ociClient,
-		httpClient:      httpx.BaseClient(),
-		tmpls:           tmpls,
-		registryAddress: registryAddr,
-	}, nil
+	w := &Web{
+		router: router,
+		log:    logr.Discard(),
+		tmpls:  tmpls,
+	}
+	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
+		if err := opt(w); err != nil {
+			return nil, err
+		}
+	}
+
+	httpClient := &http.Client{}
+	if w.transport != nil {
+		httpClient.Transport = w.transport
+	} else {
+		httpClient.Transport = httpx.BaseTransport()
+	}
+
+	w.httpClient = httpClient
+	w.ociClient = oci.NewClient(httpClient)
+
+	return w, nil
 }
 
-func (w *Web) Handler(log logr.Logger) http.Handler {
-	m := httpx.NewServeMux(log)
+func (w *Web) Handler() http.Handler {
+	m := httpx.NewServeMux(w.log)
 	m.Handle("GET /debug/web/", w.indexHandler)
 	m.Handle("GET /debug/web/stats", w.statsHandler)
 	m.Handle("GET /debug/web/measure", w.measureHandler)
@@ -60,31 +107,86 @@ func (w *Web) Handler(log logr.Logger) http.Handler {
 }
 
 func (w *Web) indexHandler(rw httpx.ResponseWriter, req *http.Request) {
-	err := w.tmpls.ExecuteTemplate(rw, "index.html", nil)
+	var data struct{ ImageName string }
+	if w.image == nil {
+		req, err := http.NewRequestWithContext(req.Context(), http.MethodGet, w.baseURL(req)+"/v2/_catalog", nil)
+		if err != nil {
+			w.log.Error(err, "unable to create catalog")
+			rw.WriteError(http.StatusInternalServerError, err)
+			return
+		}
+		resp, err := w.httpClient.Do(req)
+		if err != nil {
+			w.log.Error(err, "unable to get catalog")
+			rw.WriteError(http.StatusInternalServerError, err)
+			return
+		}
+		defer httpx.DrainAndClose(resp.Body)
+
+		if resp.StatusCode != http.StatusOK {
+			w.log.Error(fmt.Errorf("unexpected status code: %d", resp.StatusCode), "unable to get catalog")
+			rw.WriteError(http.StatusInternalServerError, fmt.Errorf("invalid _catalog response status %s", resp.Status))
+			return
+		}
+		respBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			w.log.Error(err, "unable to read response body")
+			rw.WriteError(http.StatusInternalServerError, err)
+			return
+		}
+		var image []oci.Image
+		if err = json.Unmarshal(respBody, &image); err == nil {
+			w.image = image
+		} else {
+			w.log.Error(err, "unable to unmarshal response body")
+			rw.WriteError(http.StatusInternalServerError, err)
+			return
+		}
+	}
+	if len(w.image) == 0 {
+		data.ImageName = req.UserAgent()
+	} else {
+		i := w.image[w.imageIndex]
+		data.ImageName = fmt.Sprintf("%s/%s:%s", i.Registry, i.Repository, i.Tag)
+		if w.imageIndex == len(w.image)-1 {
+			w.image = nil
+			w.imageIndex = 0
+		} else {
+			w.imageIndex += 1
+		}
+	}
+	err := w.tmpls.ExecuteTemplate(rw, "index.html", data)
 	if err != nil {
+		w.log.Error(err, "unable to execute template")
 		rw.WriteError(http.StatusInternalServerError, err)
 		return
 	}
 }
 
 func (w *Web) statsHandler(rw httpx.ResponseWriter, req *http.Request) {
-	//nolint: errcheck // Ignore error.
-	srvAddr := req.Context().Value(http.LocalAddrContextKey).(net.Addr)
-	req, err := http.NewRequestWithContext(req.Context(), http.MethodGet, fmt.Sprintf("http://%s/metrics", srvAddr.String()), nil)
+	req, err := http.NewRequestWithContext(req.Context(), http.MethodGet, w.baseURL(req)+"/metrics", nil)
 	if err != nil {
+		w.log.Error(err, "unable to create stats request")
 		rw.WriteError(http.StatusInternalServerError, err)
 		return
 	}
 	resp, err := w.httpClient.Do(req)
 	if err != nil {
+		w.log.Error(err, "unable to get stats request")
 		rw.WriteError(http.StatusInternalServerError, err)
 		return
 	}
 	defer httpx.DrainAndClose(resp.Body)
 
+	if resp.StatusCode != http.StatusOK {
+		w.log.Error(fmt.Errorf("unexpected status code: %d", resp.StatusCode), "unable to get stats response")
+		rw.WriteError(http.StatusInternalServerError, fmt.Errorf("invalid metrics response status %s", resp.Status))
+		return
+	}
 	parser := expfmt.NewTextParser(model.UTF8Validation)
 	metricFamilies, err := parser.TextToMetricFamilies(resp.Body)
 	if err != nil {
+		w.log.Error(err, "unable to parse metrics response")
 		rw.WriteError(http.StatusInternalServerError, err)
 		return
 	}
@@ -111,6 +213,7 @@ func (w *Web) statsHandler(rw httpx.ResponseWriter, req *http.Request) {
 
 	err = w.tmpls.ExecuteTemplate(rw, "stats.html", data)
 	if err != nil {
+		w.log.Error(err, "unable to execute template")
 		rw.WriteError(http.StatusInternalServerError, err)
 		return
 	}
@@ -137,19 +240,23 @@ type pullResult struct {
 }
 
 func (w *Web) measureHandler(rw httpx.ResponseWriter, req *http.Request) {
-	mirror := &url.URL{
-		Scheme: "http",
-		Host:   w.registryAddress,
+	mirror, err := url.Parse(w.baseURL(req))
+	if err != nil {
+		w.log.Error(err, "unable to parse mirror url")
+		rw.WriteError(http.StatusBadRequest, err)
+		return
 	}
 
 	// Parse image name.
 	imgName := req.URL.Query().Get("image")
 	if imgName == "" {
+		w.log.Error(err, "unable to parse image name")
 		rw.WriteError(http.StatusBadRequest, NewHTMLResponseError(errors.New("image name cannot be empty")))
 		return
 	}
 	img, err := oci.ParseImage(imgName, oci.AllowDefaults(), oci.AllowTagOnly())
 	if err != nil {
+		w.log.Error(err, "unable to parse image")
 		rw.WriteError(http.StatusBadRequest, NewHTMLResponseError(err))
 		return
 	}
@@ -160,6 +267,7 @@ func (w *Web) measureHandler(rw httpx.ResponseWriter, req *http.Request) {
 	resolveStart := time.Now()
 	peerCh, err := w.router.Resolve(req.Context(), img.Identifier(), 0)
 	if err != nil {
+		w.log.Error(err, "unable to lookup image")
 		rw.WriteError(http.StatusInternalServerError, NewHTMLResponseError(err))
 		return
 	}
@@ -176,6 +284,7 @@ func (w *Web) measureHandler(rw httpx.ResponseWriter, req *http.Request) {
 		// Pull the image and measure performance.
 		pullMetrics, err := w.ociClient.Pull(req.Context(), img, oci.WithPullMirror(mirror))
 		if err != nil {
+			w.log.Error(err, "unable to pull image")
 			rw.WriteError(http.StatusInternalServerError, NewHTMLResponseError(err))
 			return
 		}
@@ -193,6 +302,7 @@ func (w *Web) measureHandler(rw httpx.ResponseWriter, req *http.Request) {
 
 	err = w.tmpls.ExecuteTemplate(rw, "measure.html", res)
 	if err != nil {
+		w.log.Error(err, "unable to execute template")
 		rw.WriteError(http.StatusInternalServerError, NewHTMLResponseError(err))
 		return
 	}
@@ -213,6 +323,19 @@ func (e *HTMLResponseError) ResponseBody() ([]byte, string, error) {
 		return nil, "", errors.New("no error set")
 	}
 	return fmt.Appendf(nil, `<p class="error">%s</p>`, html.EscapeString(e.Error())), httpx.ContentTypeText, nil
+}
+
+func (w *Web) baseURL(req *http.Request) string {
+	addr := w.registryAddress
+	if addr == "" {
+		//nolint: errcheck // Ignore error.
+		srvAddr := req.Context().Value(http.LocalAddrContextKey).(net.Addr)
+		addr = srvAddr.String()
+	}
+	if req.TLS != nil {
+		return "https://" + addr
+	}
+	return "http://" + addr
 }
 
 func formatBytes(size int64) string {

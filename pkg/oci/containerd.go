@@ -209,15 +209,15 @@ func (c *Containerd) Features(ctx context.Context) (Feature, error) {
 }
 
 func featuresForVersion(version string) (Feature, error) {
-	v, err := utilversion.Parse(version)
+	v, err := utilversion.ParseGeneric(version)
 	if err != nil {
 		return 0, fmt.Errorf("could not parse version %s: %w", version, err)
 	}
 	feats := Feature(0)
-	if v.LessThan(utilversion.MustParse("2.0")) {
+	if v.LessThan(utilversion.MustParseGeneric("2.0")) {
 		feats.Set(FeatureConfigCheck)
 	}
-	if v.AtLeast(utilversion.MustParse("2.1")) {
+	if v.AtLeast(utilversion.MustParseGeneric("2.1")) {
 		feats.Set(FeatureContentEvent)
 	}
 	return feats, nil
@@ -314,6 +314,10 @@ func (c *Containerd) ListImages(ctx context.Context) ([]Image, error) {
 		img, err := ParseImage(cImg.Name(), WithDigest(cImg.Target().Digest))
 		if err != nil {
 			return nil, err
+		}
+		_, ok := img.TagName()
+		if !ok {
+			continue
 		}
 		imgs = append(imgs, img)
 	}
@@ -510,7 +514,7 @@ func createFilters(parsedMirroredRegistries []url.URL) ([]string, []string, []st
 		registryHosts = append(registryHosts, strings.ReplaceAll(registry.Host, `.`, `\\.`))
 	}
 	imageFilter := fmt.Sprintf(`name~="^(%s)/"`, strings.Join(registryHosts, "|"))
-	if len(registryHosts) == 0 {
+	if len(registryHosts) == 0 || strings.Contains(imageFilter, wildcardRegistryMirrors[1]) {
 		// Filter images that do not have a registry in it's reference,
 		// as we cant mirror images without registries.
 		imageFilter = `name~="^.+/"`

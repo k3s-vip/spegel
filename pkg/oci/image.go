@@ -36,6 +36,15 @@ func NewImage(registry, repository, tag string, dgst digest.Digest) (Image, erro
 	}, nil
 }
 
+func (i Image) IsLatestTag() bool {
+	for j := range i.Tag {
+		if 48 <= i.Tag[j] && i.Tag[j] <= 57 {
+			return false
+		}
+	}
+	return true
+}
+
 func (i Image) String() string {
 	tag := ""
 	if i.Tag != "" {
