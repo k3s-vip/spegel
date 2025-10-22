@@ -186,6 +186,10 @@ func (c *Containerd) ListImages(ctx context.Context) ([]Image, error) {
 		if err != nil {
 			return nil, err
 		}
+		_, ok := img.TagName()
+		if !ok {
+			continue
+		}
 		imgs = append(imgs, img)
 	}
 	return imgs, nil
@@ -342,15 +346,15 @@ func containerdFeatures(ctx context.Context, client *client.Client) (Feature, er
 }
 
 func featuresForVersion(version string) (Feature, error) {
-	v, err := utilversion.Parse(version)
+	v, err := utilversion.ParseGeneric(version)
 	if err != nil {
 		return 0, fmt.Errorf("could not parse version %s: %w", version, err)
 	}
 	features := Feature(0)
-	if v.LessThan(utilversion.MustParse("2.0")) {
+	if v.LessThan(utilversion.MustParseGeneric("2.0")) {
 		features.Set(FeatureConfigCheck)
 	}
-	if v.AtLeast(utilversion.MustParse("2.1")) {
+	if v.AtLeast(utilversion.MustParseGeneric("2.1")) {
 		features.Set(FeatureContentEvent)
 	}
 	return features, nil
