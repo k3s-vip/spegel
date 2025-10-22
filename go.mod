@@ -9,7 +9,6 @@ require (
 	github.com/alexflint/go-arg v1.6.0
 	github.com/avast/retry-go/v4 v4.7.0
 	github.com/containerd/containerd/api v1.9.0
-	github.com/containerd/containerd/v2 v2.1.4
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/platforms v1.0.0-rc.1
 	github.com/containerd/typeurl/v2 v2.2.3
