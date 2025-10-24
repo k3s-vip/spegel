@@ -250,6 +250,7 @@ func registryCommand(ctx context.Context, args *RegistryCmd) error {
 		webOpts := []web.WebOption{
 			web.WithAddress(args.RegistryAddr),
 			web.WithLogger(log),
+			web.WithOCIStore(ociStore),
 		}
 		web, err := web.NewWeb(router, webOpts...)
 		if err != nil {

@@ -32,6 +32,7 @@ type Web struct {
 	router          routing.Router
 	log             logr.Logger
 	ociClient       *oci.Client
+	ociStore        oci.Store
 	ociImage        []oci.Image
 	ociIndex        int
 	httpClient      *http.Client
@@ -52,6 +53,13 @@ func WithAddress(addr string) WebOption {
 func WithLogger(log logr.Logger) WebOption {
 	return func(w *Web) error {
 		w.log = log
+		return nil
+	}
+}
+
+func WithOCIStore(ociStore oci.Store) WebOption {
+	return func(w *Web) error {
+		w.ociStore = ociStore
 		return nil
 	}
 }
@@ -183,9 +191,13 @@ func (w *Web) statsHandler(rw httpx.ResponseWriter, req *http.Request) {
 	}
 
 	data := struct {
+		LocalAddress      string
+		Images            []oci.Image
+		PeerAddresses     []string
 		MirrorLastSuccess time.Duration
 		ImageCount        int64
 		LayerCount        int64
+		PeerCount         int
 	}{}
 	if family, ok := metricFamilies["spegel_advertised_images"]; ok {
 		for _, metric := range family.Metric {
@@ -200,6 +212,20 @@ func (w *Web) statsHandler(rw httpx.ResponseWriter, req *http.Request) {
 	mirrorLastSuccess := int64(*metricFamilies["spegel_mirror_last_success_timestamp_seconds"].Metric[0].Gauge.Value)
 	if mirrorLastSuccess > 0 {
 		data.MirrorLastSuccess = time.Since(time.Unix(mirrorLastSuccess, 0))
+	}
+
+	if p2pRouter, ok := w.router.(*routing.P2PRouter); ok {
+		peerAddrs := p2pRouter.PeerAddresses()
+		data.PeerCount = len(peerAddrs)
+		data.PeerAddresses = peerAddrs
+		data.LocalAddress = p2pRouter.LocalAddress()
+	}
+
+	if w.ociStore != nil {
+		images, err := w.ociStore.ListImages(req.Context())
+		if err == nil {
+			data.Images = images
+		}
 	}
 
 	err = w.tmpls.ExecuteTemplate(rw, "stats.html", data)
