@@ -74,6 +74,9 @@ func (s *ServeMux) Handle(pattern string, handler HandlerFunc) {
 				for k, v := range rw.attrs {
 					kvs = append(kvs, k, v)
 				}
+				if ns := req.URL.Query().Get("ns"); ns != "" {
+					kvs = append(kvs, "ns", ns)
+				}
 				if rw.Status() >= 200 && rw.Status() < 400 {
 					s.log.Info("", kvs...)
 				} else {
