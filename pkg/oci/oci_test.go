@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/core/metadata"
-	"github.com/containerd/containerd/v2/pkg/namespaces"
-	"github.com/containerd/containerd/v2/plugins/content/local"
+	"github.com/containerd/containerd"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/content/local"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/metadata"
+	"github.com/containerd/containerd/namespaces"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -42,7 +42,7 @@ func TestStore(t *testing.T) {
 	db := metadata.NewDB(boltDB, contentStore, nil)
 	imageStore := metadata.NewImageStore(db)
 	ctx := namespaces.WithNamespace(t.Context(), "k8s.io")
-	containerdClient, err := client.New("", client.WithServices(client.WithImageStore(imageStore), client.WithContentStore(contentStore)))
+	containerdClient, err := containerd.New("", containerd.WithServices(containerd.WithImageStore(imageStore), containerd.WithContentStore(contentStore)))
 	require.NoError(t, err)
 	remoteMtCache, err := lru.New[digest.Digest, string](100)
 	require.NoError(t, err)

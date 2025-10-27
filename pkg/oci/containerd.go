@@ -17,12 +17,12 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
+	"github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/core/events"
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/pkg/labels"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	"github.com/go-logr/logr"
@@ -31,7 +31,6 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pelletier/go-toml/v2"
 	tomlu "github.com/pelletier/go-toml/v2/unstable"
-	"google.golang.org/grpc"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 
@@ -86,7 +85,7 @@ func WithContentPath(path string) ContainerdOption {
 var _ Store = &Containerd{}
 
 type Containerd struct {
-	client       *client.Client
+	client       *containerd.Client
 	mediaTypeIdx *lru.Cache[digest.Digest, string]
 	contentPath  string
 	features     Feature
@@ -99,7 +98,7 @@ func NewContainerd(ctx context.Context, sock, namespace string, opts ...Containe
 		return nil, err
 	}
 
-	client, err := client.New(sock, client.WithDefaultNamespace(namespace))
+	client, err := containerd.New(sock, containerd.WithDefaultNamespace(namespace))
 	if err != nil {
 		return nil, err
 	}
@@ -460,12 +459,8 @@ func (c *Containerd) handleEvent(ctx context.Context, envelope events.Envelope, 
 	}
 }
 
-func containerdFeatures(ctx context.Context, client *client.Client) (Feature, error) {
-	grpcConn, ok := client.Conn().(*grpc.ClientConn)
-	if !ok {
-		return 0, errors.New("client connection is not grpc")
-	}
-	srv := runtimeapi.NewRuntimeServiceClient(grpcConn)
+func containerdFeatures(ctx context.Context, client *containerd.Client) (Feature, error) {
+	srv := runtimeapi.NewRuntimeServiceClient(client.Conn())
 	versionResp, err := srv.Version(ctx, &runtimeapi.VersionRequest{})
 	if err != nil {
 		return 0, err
@@ -492,7 +487,7 @@ func featuresForVersion(version string) (Feature, error) {
 	return features, nil
 }
 
-func verifyContainerd(ctx context.Context, client *client.Client, features Feature, registryConfigPath string) error {
+func verifyContainerd(ctx context.Context, client *containerd.Client, features Feature, registryConfigPath string) error {
 	log := logr.FromContextOrDiscard(ctx)
 	ok, err := client.IsServing(ctx)
 	if err != nil {
@@ -506,11 +501,7 @@ func verifyContainerd(ctx context.Context, client *client.Client, features Featu
 		log.Info("skipping verification of Containerd configuration")
 		return nil
 	}
-	grpcConn, ok := client.Conn().(*grpc.ClientConn)
-	if !ok {
-		return errors.New("client connection is not grpc")
-	}
-	srv := runtimeapi.NewRuntimeServiceClient(grpcConn)
+	srv := runtimeapi.NewRuntimeServiceClient(client.Conn())
 	statusResp, err := srv.Status(ctx, &runtimeapi.StatusRequest{Verbose: true})
 	if err != nil {
 		return err
