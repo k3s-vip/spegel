@@ -1,6 +1,4 @@
-FROM gcr.io/distroless/static:nonroot
-ARG TARGETOS
+FROM alpine:3.23
 ARG TARGETARCH
-COPY ./dist/spegel_${TARGETOS}_${TARGETARCH}/spegel /
-USER root:root
+COPY .git/$TARGETARCH /spegel
 ENTRYPOINT ["/spegel"]
