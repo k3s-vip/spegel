@@ -279,7 +279,7 @@ func (c *Client) Fetch(ctx context.Context, method string, dist DistributionPath
 		u.Host = cfg.Mirror.Host
 		u.Path = path.Join(cfg.Mirror.Path, u.Path)
 	}
-	if u.Host == "docker.io" {
+	if u.Host == DefaultRegistry {
 		u.Host = "registry-1.docker.io"
 	}
 
