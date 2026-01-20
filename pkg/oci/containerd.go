@@ -18,12 +18,12 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
+	client "github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/core/events"
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/pkg/labels"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/images"
+	"github.com/containerd/containerd/labels"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	"github.com/go-logr/logr"
@@ -348,6 +348,7 @@ func (c *Containerd) handleEvent(ctx context.Context, envelope events.Envelope, 
 			return nil, err
 		}
 		refs := []Reference{}
+		events := []OCIEvent{}
 		handler := images.HandlerFunc(func(ctx context.Context, desc ocispec.Descriptor) ([]ocispec.Descriptor, error) {
 			children, err := images.ChildrenHandler(c.client.ContentStore()).Handle(ctx, desc)
 			if errors.Is(err, errdefs.ErrNotFound) {
@@ -362,6 +363,7 @@ func (c *Containerd) handleEvent(ctx context.Context, envelope events.Envelope, 
 				Digest:     desc.Digest,
 			}
 			refs = append(refs, ref)
+			events = append(events, OCIEvent{Type: CreateEvent, Reference: ref})
 			return children, nil
 		})
 		err = images.Walk(ctx, handler, cImg.Target)
@@ -369,7 +371,7 @@ func (c *Containerd) handleEvent(ctx context.Context, envelope events.Envelope, 
 			return nil, err
 		}
 		contentIdx[img.Digest] = refs
-		return nil, nil
+		return events, nil
 	case *eventtypes.ImageDelete:
 		img, err := ParseImage(e.GetName(), AllowTagOnly())
 		if err != nil {
