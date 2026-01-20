@@ -6,8 +6,8 @@ require (
 	cuelabs.dev/go/oci/ociregistry v0.0.0-20250530080122-d0efc28a5723
 	github.com/alexflint/go-arg v1.6.1
 	github.com/avast/retry-go/v4 v4.7.0
+	github.com/containerd/containerd v1.7.30
 	github.com/containerd/containerd/api v1.10.0
-	github.com/containerd/containerd/v2 v2.1.6 // for runtime-spec v1.2.1
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/platforms v1.0.0-rc.2
 	github.com/containerd/typeurl/v2 v2.2.3
