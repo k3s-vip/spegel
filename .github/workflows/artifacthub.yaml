@@ -1,7 +1,6 @@
 name: artifacthub
 on:
   push:
-    branches: ["main"]
     paths: 
       - "charts/spegel/artifacthub-repo.yml"
 permissions:

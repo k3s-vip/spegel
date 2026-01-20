@@ -9,11 +9,7 @@ metadata:
   {{- end }}
   labels:
     app.kubernetes.io/component: spegel
-    {{- include "spegel.labels" . | nindent 4 }}
 spec:
-  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
-  updateStrategy:
-    {{- toYaml .Values.updateStrategy | nindent 4 }}
   selector:
     matchLabels:
       app.kubernetes.io/component: spegel
@@ -35,17 +31,12 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "spegel.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       priorityClassName: {{ .Values.priorityClassName }}
       {{- if .Values.spegel.containerdMirrorAdd }}
       initContainers:
       - name: configuration
         image: "{{ include "spegel.image" . }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
-        securityContext:
-          {{- toYaml .Values.securityContext | nindent 12 }}
         args:
           - configuration
           - --log-level={{ .Values.spegel.logLevel }}
@@ -63,7 +54,7 @@ spec:
           - http://$(NODE_IP):{{ .Values.service.registry.nodePort }}
           {{- with .Values.spegel.additionalMirrorTargets }}
           {{- range . }}
-          - {{ . | quote }}
+          - {{ . }}
           {{- end }}
           {{- end }}
           - --resolve-tags={{ .Values.spegel.resolveTags }}
@@ -71,8 +62,6 @@ spec:
         env:
         - name: NODE_IP
         {{- include "networking.nodeIp" . | nindent 10 }}
-        resources:
-          {{- toYaml .Values.resources | nindent 10 }}
         volumeMounts:
           - name: containerd-config
             mountPath: {{ .Values.spegel.containerdRegistryConfigPath }}
@@ -86,8 +75,6 @@ spec:
       - name: registry
         image: "{{ include "spegel.image" . }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
-        securityContext:
-          {{- toYaml .Values.securityContext | nindent 12 }}
         args:
           - registry
           - --log-level={{ .Values.spegel.logLevel }}
@@ -135,12 +122,9 @@ spec:
             hostPort: {{ .Values.service.registry.hostPort }}
             {{- end }}
             protocol: TCP
-          - name: router-tcp
+          - name: router
             containerPort: {{ .Values.service.router.port }}
             protocol: TCP
-          - name: router-quic
-            containerPort: {{ .Values.service.router.port }}
-            protocol: UDP
           - name: metrics
             containerPort: {{ .Values.service.metrics.port }}
             protocol: TCP
@@ -175,8 +159,6 @@ spec:
             mountPath: {{ . }}
             readOnly: true
           {{- end }}
-        resources:
-          {{- toYaml .Values.resources | nindent 10 }}
       volumes:
         {{- with .Values.basicAuthSecretName }}
         - name: basic-auth
@@ -191,7 +173,7 @@ spec:
         - name: containerd-content
           hostPath:
             path: {{ . }}
-            type: Directory
+            type: DirectoryOrCreate
         {{- end }}
         {{- if .Values.spegel.containerdMirrorAdd }}
         - name: containerd-config
