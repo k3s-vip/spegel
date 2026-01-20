@@ -30,7 +30,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/sec"
-	quic "github.com/libp2p/go-libp2p/p2p/transport/quic"
 	"github.com/libp2p/go-libp2p/p2p/transport/tcp"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -112,7 +111,6 @@ func NewP2PRouter(ctx context.Context, addr string, bs Bootstrapper, registryPor
 	hostOpts := []libp2p.Option{
 		libp2p.ChainOptions(
 			libp2p.NoTransports,
-			libp2p.Transport(quic.NewTransport),
 			libp2p.Transport(tcp.NewTCPTransport),
 		),
 		libp2p.ListenAddrs(listenAddrs...),
@@ -480,20 +478,12 @@ func listenMultiaddrs(addr string) ([]ma.Multiaddr, error) {
 	}
 
 	listenAddrs := []ma.Multiaddr{}
-	udpComp, err := ma.NewComponent("udp", p)
-	if err != nil {
-		return nil, err
-	}
-	quicComp, err := ma.NewComponent("quic-v1", "")
-	if err != nil {
-		return nil, err
-	}
 	tcpComp, err := ma.NewComponent("tcp", p)
 	if err != nil {
 		return nil, err
 	}
 	for _, ipComp := range ipComps {
-		listenAddrs = append(listenAddrs, ma.Join(ipComp.Multiaddr(), udpComp, quicComp), ma.Join(ipComp.Multiaddr(), tcpComp))
+		listenAddrs = append(listenAddrs, ma.Join(ipComp.Multiaddr(), tcpComp))
 	}
 	return listenAddrs, nil
 }

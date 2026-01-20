@@ -49,6 +49,8 @@ type Web struct {
 	mirror    *url.URL
 	router    *routing.P2PRouter
 	ociClient *oci.Client
+	ociImage  []oci.Image
+	ociIndex  int
 	ociStore  oci.Store
 	tmpls     *template.Template
 	reg       *registry.Registry
@@ -99,7 +101,26 @@ func (w *Web) Handler(log logr.Logger) http.Handler {
 }
 
 func (w *Web) indexHandler(rw httpx.ResponseWriter, req *http.Request) {
-	err := w.tmpls.ExecuteTemplate(rw, "index.html", nil)
+	var data struct{ TagName string }
+	if w.ociImage == nil {
+		images, err := w.ociStore.ListImages(req.Context())
+		if err != nil {
+			rw.WriteError(http.StatusInternalServerError, err)
+			return
+		}
+		w.ociImage = images
+	}
+	if len(w.ociImage) == 0 {
+		data.TagName = req.UserAgent()
+	} else {
+		data.TagName, _ = w.ociImage[w.ociIndex].TagName()
+		if w.ociIndex == len(w.ociImage)-1 {
+			w.ociIndex, w.ociImage = 0, nil
+		} else {
+			w.ociIndex += 1
+		}
+	}
+	err := w.tmpls.ExecuteTemplate(rw, "index.html", data)
 	if err != nil {
 		rw.WriteError(http.StatusInternalServerError, err)
 		return

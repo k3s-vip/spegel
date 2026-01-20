@@ -1,0 +1,177 @@
+---
+# Source: spegel/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: spegel
+  namespace: kube-system
+spec:
+  selector:
+    app.kubernetes.io/component: spegel
+    app.kubernetes.io/name: spegel
+    app.kubernetes.io/instance: spegel
+  ports:
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+---
+# Source: spegel/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: spegel-registry
+  namespace: kube-system
+  annotations:
+    service.kubernetes.io/topology-mode: "auto"
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/component: spegel
+    app.kubernetes.io/name: spegel
+    app.kubernetes.io/instance: spegel
+  ports:
+    - name: registry
+      port: 5000
+      targetPort: registry
+      nodePort: 30021
+      protocol: TCP
+---
+# Source: spegel/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: spegel-bootstrap
+  namespace: kube-system
+spec:
+  selector:
+    app.kubernetes.io/component: spegel
+    app.kubernetes.io/name: spegel
+    app.kubernetes.io/instance: spegel
+  clusterIP: None
+  publishNotReadyAddresses: true
+---
+# Source: spegel/templates/daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: spegel
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/component: spegel
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: spegel
+      app.kubernetes.io/name: spegel
+      app.kubernetes.io/instance: spegel
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: spegel
+        app.kubernetes.io/name: spegel
+        app.kubernetes.io/instance: spegel
+    spec:
+      priorityClassName: system-node-critical
+      initContainers:
+      - name: configuration
+        image: "muicoder/spegel:latest"
+        imagePullPolicy: IfNotPresent
+        args:
+          - configuration
+          - --log-level=INFO
+          - --containerd-registry-config-path=/etc/containerd/certs.d
+          - --mirror-targets
+          - http://$(NODE_IP):30020
+          - http://$(NODE_IP):30021
+          - --resolve-tags=true
+          - --prepend-existing=true
+        env:
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        volumeMounts:
+          - name: containerd-config
+            mountPath: /etc/containerd/certs.d
+      containers:
+      - name: registry
+        image: "muicoder/spegel:latest"
+        imagePullPolicy: IfNotPresent
+        args:
+          - registry
+          - --log-level=INFO
+          - --mirror-resolve-retries=3
+          - --mirror-resolve-timeout=20ms
+          - --registry-addr=:5000
+          - --router-addr=:5001
+          - --metrics-addr=:9090
+          - --containerd-sock=/run/containerd/containerd.sock
+          - --containerd-namespace=k8s.io
+          - --bootstrap-kind=dns
+          - --dns-bootstrap-domain=spegel-bootstrap.kube-system.svc.cluster.local.
+          - --containerd-content-path=/var/lib/containerd/io.containerd.content.v1.content
+          - --debug-web-enabled=true
+        env:
+        - name: DATA_DIR
+          value: ""
+        - name: GOMEMLIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.memory
+              divisor: 1
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        ports:
+          - name: registry
+            containerPort: 5000
+            hostPort: 30020
+            protocol: TCP
+          - name: router
+            containerPort: 5001
+            protocol: TCP
+          - name: metrics
+            containerPort: 9090
+            protocol: TCP
+        # Startup may take a bit longer on bootsrap as Pods need to find each other.
+        # This is why the startup proben is a bit more forgiving, while hitting the endpoint more often.
+        startupProbe:
+          periodSeconds: 3
+          failureThreshold: 60
+          httpGet:
+            path: /readyz
+            port: registry
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: registry
+        volumeMounts:
+          - name: containerd-sock
+            mountPath: /run/containerd/containerd.sock
+          - name: containerd-content
+            mountPath: /var/lib/containerd/io.containerd.content.v1.content
+            readOnly: true
+      volumes:
+        - name: containerd-sock
+          hostPath:
+            path: /run/containerd/containerd.sock
+            type: Socket
+        - name: containerd-content
+          hostPath:
+            path: /var/lib/containerd/io.containerd.content.v1.content
+            type: DirectoryOrCreate
+        - name: containerd-config
+          hostPath:
+            path: /etc/containerd/certs.d
+            type: DirectoryOrCreate
+      nodeSelector:
+        kubernetes.io/os: linux
+      tolerations:
+        - key: CriticalAddonsOnly
+          operator: Exists
+        - effect: NoExecute
+          operator: Exists
+        - effect: NoSchedule
+          operator: Exists
