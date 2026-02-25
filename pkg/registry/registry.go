@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -183,6 +184,20 @@ func (r *Registry) registryHandler(rw httpx.ResponseWriter, req *http.Request) {
 	if path.Clean(req.URL.Path) == "/v2" {
 		rw.SetAttrs(HandlerAttrKey, "v2")
 		rw.WriteHeader(http.StatusOK)
+		return
+	}
+	if path.Clean(req.URL.Path) == "/v2/_catalog" {
+		imgs, err := r.ociStore.ListImages(req.Context())
+		if err == nil {
+			b, _ := json.Marshal(imgs)
+			if _, err = rw.Write(b); err == nil {
+				rw.WriteHeader(http.StatusOK)
+			} else {
+				rw.WriteError(http.StatusInternalServerError, err)
+			}
+		} else {
+			rw.WriteError(http.StatusInternalServerError, err)
+		}
 		return
 	}
 

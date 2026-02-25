@@ -3,9 +3,6 @@ kind: Service
 metadata:
   name: {{ include "spegel.fullname" . }}
   namespace: {{ include "spegel.namespace" . }}
-  labels:
-    app.kubernetes.io/component: metrics
-    {{- include "spegel.labels" . | nindent 4 }}
   {{- with .Values.service.metrics.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -25,8 +22,6 @@ kind: Service
 metadata:
   name: {{ include "spegel.fullname" . }}-registry
   namespace: {{ include "spegel.namespace" . }}
-  labels:
-    {{- include "spegel.labels" . | nindent 4 }}
   {{- if or (and (not .Values.service.registry.usePreferSameNodeTrafficDistribution) .Values.service.registry.topologyAwareHintsEnabled) .Values.service.registry.annotations }}
   annotations:
     {{- if and (not .Values.service.registry.usePreferSameNodeTrafficDistribution) .Values.service.registry.topologyAwareHintsEnabled }}
@@ -56,8 +51,6 @@ kind: Service
 metadata:
   name: {{ include "spegel.fullname" . }}-bootstrap
   namespace: {{ include "spegel.namespace" . }}
-  labels:
-    {{- include "spegel.labels" . | nindent 4 }}
   {{- with .Values.service.bootstrap.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
