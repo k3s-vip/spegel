@@ -16,6 +16,7 @@ import (
 
 	"github.com/avast/retry-go/v4"
 	"github.com/go-logr/logr"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/spegel-org/spegel/internal/option"
 	"github.com/spegel-org/spegel/pkg/httpx"
@@ -271,6 +272,14 @@ func (r *Registry) mirrorHandler(rw httpx.ResponseWriter, req *http.Request, dis
 	// Resume range for when blobs fail midway through copying.
 	var resumeRng *httpx.Range
 
+	// Set timeout for non blob data requests.
+	fetchCtx := req.Context()
+	if req.Method == http.MethodHead || dist.Kind == oci.DistributionKindManifest {
+		var reqCancel context.CancelFunc
+		fetchCtx, reqCancel = context.WithTimeout(req.Context(), 3*time.Second)
+		defer reqCancel()
+	}
+
 	retryOpts := []retry.Option{
 		retry.Context(req.Context()),
 		retry.Attempts(uint(r.resolveRetries)),
@@ -288,41 +297,45 @@ func (r *Registry) mirrorHandler(rw httpx.ResponseWriter, req *http.Request, dis
 
 		mirrorDetails.Attempts += 1
 
-		mirror := &url.URL{
-			Scheme: "http",
-			Host:   netip.AddrPortFrom(peer.Addresses[0], peer.Metadata.RegistryPort).String(),
+		type fetchResult struct {
+			rc   io.ReadCloser
+			desc ocispec.Descriptor
 		}
-		if req.TLS != nil {
-			mirror.Scheme = "https"
-		}
-		fetchOpts := []oci.FetchOption{
-			oci.WithFetchHeader(HeaderSpegelMirrored, "true"),
-			oci.WithFetchMirror(mirror),
-			oci.WithFetchBasicAuth(r.username, r.password),
-		}
-		// Override range header with resume range if set.
-		if resumeRng != nil {
-			fetchOpts = append(fetchOpts, oci.WithFetchRange(*resumeRng))
-		} else if h := req.Header.Get(httpx.HeaderRange); h != "" {
-			fetchOpts = append(fetchOpts, oci.WithFetchHeader(httpx.HeaderRange, h))
-		}
-
-		fetchCtx := req.Context()
-		if req.Method == http.MethodHead {
-			var reqCancel context.CancelFunc
-			fetchCtx, reqCancel = context.WithTimeout(req.Context(), 1*time.Second)
-			defer reqCancel()
-		} else if req.Method == http.MethodGet && dist.Kind == oci.DistributionKindManifest {
-			var reqCancel context.CancelFunc
-			fetchCtx, reqCancel = context.WithTimeout(req.Context(), 2*time.Second)
-			defer reqCancel()
-		}
-
-		rc, desc, err := r.ociClient.Fetch(fetchCtx, req.Method, dist, fetchOpts...)
+		res, err := httpx.HappyEyeballs(fetchCtx, peer.Addresses, func(ctx context.Context, ipAddr netip.Addr) (fetchResult, error) {
+			mirror := &url.URL{
+				Scheme: "http",
+				Host:   netip.AddrPortFrom(peer.Addresses[0], peer.Metadata.RegistryPort).String(),
+			}
+			if req.TLS != nil {
+				mirror.Scheme = "https"
+			}
+			fetchOpts := []oci.FetchOption{
+				oci.WithFetchHeader(HeaderSpegelMirrored, "true"),
+				oci.WithFetchMirror(mirror),
+				oci.WithFetchBasicAuth(r.username, r.password),
+			}
+			// Override range header with resume range if set.
+			if resumeRng != nil {
+				fetchOpts = append(fetchOpts, oci.WithFetchRange(*resumeRng))
+			} else if h := req.Header.Get(httpx.HeaderRange); h != "" {
+				fetchOpts = append(fetchOpts, oci.WithFetchHeader(httpx.HeaderRange, h))
+			}
+			rc, desc, err := r.ociClient.Fetch(fetchCtx, req.Method, dist, fetchOpts...)
+			if err != nil {
+				return fetchResult{}, err
+			}
+			res := fetchResult{
+				desc: desc,
+				rc:   rc,
+			}
+			return res, nil
+		})
 		if err != nil {
 			balancer.Remove(peer)
 			return fmt.Errorf("request to mirror failed: %w", err)
 		}
+		desc := res.desc
+		rc := res.rc
 		defer httpx.DrainAndClose(rc)
 
 		if !rw.HeadersWritten() {
