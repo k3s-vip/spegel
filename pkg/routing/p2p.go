@@ -79,16 +79,15 @@ func WithAdvertiseTTL(ttl time.Duration) P2PRouterOption {
 var _ Router = &P2PRouter{}
 
 type P2PRouter struct {
-	bootstrapper           Bootstrapper
-	host                   host.Host
-	kdht                   *dht.IpfsDHT
-	prov                   *provider.SweepingProvider
-	balancerGroup          *singleflight.Group
-	balancerCache          *expirable.LRU[string, *ClosableBalancer]
-	connectivityGate       *channel.Gate
-	protocols              []ma.Multiaddr
-	ip6Support, ip4Support bool
-	registryPort           uint16
+	bootstrapper     Bootstrapper
+	host             host.Host
+	kdht             *dht.IpfsDHT
+	prov             *provider.SweepingProvider
+	balancerGroup    *singleflight.Group
+	balancerCache    *expirable.LRU[string, *ClosableBalancer]
+	connectivityGate *channel.Gate
+	protocols        []ma.Multiaddr
+	registryPort     uint16
 }
 
 func NewP2PRouter(ctx context.Context, addr string, bs Bootstrapper, registryPortStr string, opts ...P2PRouterOption) (*P2PRouter, error) {
@@ -119,8 +118,14 @@ func NewP2PRouter(ctx context.Context, addr string, bs Bootstrapper, registryPor
 		libp2p.DisableIdentifyAddressDiscovery(),
 		libp2p.PrometheusRegisterer(metrics.DefaultRegisterer),
 		libp2p.AddrsFactory(func(addrs []ma.Multiaddr) []ma.Multiaddr {
-			ip6Addrs, ip4Addrs := filterAndSplitAddrs(addrs)
-			return append(ip6Addrs, ip4Addrs...)
+			filtered := []ma.Multiaddr{}
+			for _, addr := range addrs {
+				if manet.IsIPLoopback(addr) {
+					continue
+				}
+				filtered = append(filtered, addr)
+			}
+			return filtered
 		}),
 	}
 	if cfg.DataDir != "" {
@@ -136,7 +141,6 @@ func NewP2PRouter(ctx context.Context, addr string, bs Bootstrapper, registryPor
 		return nil, fmt.Errorf("could not create host: %w", err)
 	}
 	protocols := protocolsFromAddrs(host.Addrs())
-	ip6Addrs, ip4Addrs := filterAndSplitAddrs(host.Addrs())
 
 	dhtOpts := []dht.Option{
 		dht.Mode(dht.ModeServer),
@@ -183,8 +187,6 @@ func NewP2PRouter(ctx context.Context, addr string, bs Bootstrapper, registryPor
 		balancerCache:    expirable.NewLRU[string, *ClosableBalancer](0, nil, 5*time.Second),
 		connectivityGate: connectivityGate,
 		protocols:        protocols,
-		ip6Support:       len(ip6Addrs) > 0,
-		ip4Support:       len(ip4Addrs) > 0,
 		registryPort:     uint16(registryPort),
 	}, nil
 }
@@ -315,39 +317,14 @@ func (r *P2PRouter) Lookup(ctx context.Context, key string, count int) (Balancer
 					continue
 				}
 
-				ip6Addrs, ip4Addrs := filterAndSplitAddrs(addrInfo.Addrs)
-				ipAddr, err := func() (netip.Addr, error) {
-					errs := []error{}
-					if r.ip6Support {
-						for _, addr := range ip6Addrs {
-							ipAddrs, err := toIPAddrs([]ma.Multiaddr{addr})
-							if err != nil {
-								errs = append(errs, err)
-								continue
-							}
-							return ipAddrs[0], nil
-						}
-					}
-					if r.ip4Support {
-						for _, addr := range ip4Addrs {
-							ipAddrs, err := toIPAddrs([]ma.Multiaddr{addr})
-							if err != nil {
-								errs = append(errs, err)
-								continue
-							}
-							return ipAddrs[0], nil
-						}
-					}
-					errs = append(errs, errors.New("could not get IP from address"))
-					return netip.Addr{}, errors.Join(errs...)
-				}()
+				ipAddrs, err := toIPAddrs(addrInfo.Addrs)
 				if err != nil {
-					log.Error(err, "no suitable IP address found for peer")
+					log.Error(err, "could not convert address")
 					continue
 				}
 				peer := Peer{
 					Host:      addrInfo.ID.String(),
-					Addresses: []netip.Addr{ipAddr},
+					Addresses: ipAddrs,
 					Metadata: PeerMetadata{
 						RegistryPort: r.registryPort,
 					},
@@ -412,9 +389,6 @@ func (r *P2PRouter) ListPeers() ([]Peer, error) {
 	ids := r.kdht.RoutingTable().ListPeers()
 	for _, id := range ids {
 		addrs := r.host.Peerstore().Addrs(id)
-		if len(addrs) == 0 {
-			continue
-		}
 		ipAddrs, err := toIPAddrs(addrs)
 		if err != nil {
 			return nil, err
@@ -501,27 +475,6 @@ func listenMultiaddrs(addr string) ([]ma.Multiaddr, error) {
 		listenAddrs = append(listenAddrs, ma.Join(ipComp.Multiaddr(), udpComp, quicComp), ma.Join(ipComp.Multiaddr(), tcpComp))
 	}
 	return listenAddrs, nil
-}
-
-func filterAndSplitAddrs(addrs []ma.Multiaddr) ([]ma.Multiaddr, []ma.Multiaddr) {
-	ip6Addrs := []ma.Multiaddr{}
-	ip4Addrs := []ma.Multiaddr{}
-	for _, addr := range addrs {
-		if manet.IsIPLoopback(addr) {
-			continue
-		}
-		c, _ := ma.SplitFirst(addr)
-		if c == nil {
-			continue
-		}
-		switch c.Protocol().Code {
-		case ma.P_IP6:
-			ip6Addrs = append(ip6Addrs, addr)
-		case ma.P_IP4:
-			ip4Addrs = append(ip4Addrs, addr)
-		}
-	}
-	return ip6Addrs, ip4Addrs
 }
 
 func protocolsFromAddrs(addrs []ma.Multiaddr) []ma.Multiaddr {

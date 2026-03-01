@@ -12,7 +12,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
-	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
@@ -60,9 +59,6 @@ func TestP2PRouter(t *testing.T) {
 	ready, err := primaryRouter.Ready(t.Context())
 	require.NoError(t, err)
 	require.False(t, ready)
-	ip6Addrs, ip4Addrs := filterAndSplitAddrs(primaryRouter.host.Addrs())
-	primaryIP, err := manet.ToIP(append(ip6Addrs, ip4Addrs...)[0])
-	require.NoError(t, err)
 
 	// Advertise and Withdraw nil keys should not error.
 	err = primaryRouter.Advertise(t.Context(), nil)
@@ -130,8 +126,9 @@ func TestP2PRouter(t *testing.T) {
 		peer, err := bal.Next()
 		require.NoError(t, err)
 		require.Equal(t, primaryRouter.host.ID().String(), peer.Host)
-		require.Len(t, peer.Addresses, 1)
-		require.Equal(t, primaryIP.String(), peer.Addresses[0].String())
+		primaryIPAddrs, err := toIPAddrs(primaryRouter.host.Addrs())
+		require.NoError(t, err)
+		require.ElementsMatch(t, primaryIPAddrs, peer.Addresses)
 
 		bal, err = r.Lookup(t.Context(), "wont find key", 3)
 		require.NoError(t, err)
@@ -142,9 +139,6 @@ func TestP2PRouter(t *testing.T) {
 	// Advertise key from another router and lookup.
 	newKey := "new"
 	lastRouter := routers[len(routers)-1]
-	ip6Addrs, ip4Addrs = filterAndSplitAddrs(lastRouter.host.Addrs())
-	lastIP, err := manet.ToIP(append(ip6Addrs, ip4Addrs...)[0])
-	require.NoError(t, err)
 	err = lastRouter.Advertise(t.Context(), []string{newKey})
 	require.NoError(t, err)
 
@@ -157,8 +151,9 @@ func TestP2PRouter(t *testing.T) {
 	peer, err := bal.Next()
 	require.NoError(t, err)
 	require.Equal(t, lastRouter.host.ID().String(), peer.Host)
-	require.Len(t, peer.Addresses, 1)
-	require.Equal(t, lastIP.String(), peer.Addresses[0].String())
+	lastIPAddrs, err := toIPAddrs(lastRouter.host.Addrs())
+	require.NoError(t, err)
+	require.ElementsMatch(t, lastIPAddrs, peer.Addresses)
 
 	// Shutdown should complete without errors.
 	cancel()
