@@ -13,7 +13,13 @@ var ErrNoNext = errors.New("no peers available for selection")
 // Peer represents a host reachable at one or more addresses.
 type Peer struct {
 	Host      string
-	Addresses []netip.AddrPort
+	Addresses []netip.Addr
+	Metadata  PeerMetadata
+}
+
+// PeerMetadata contains additional information for the peer.
+type PeerMetadata struct {
+	RegistryPort uint16
 }
 
 // Balancer defines how peers looked up are returned.

@@ -320,22 +320,22 @@ func (r *P2PRouter) Lookup(ctx context.Context, key string, count int) (Balancer
 					errs := []error{}
 					if r.ip6Support {
 						for _, addr := range ip6Addrs {
-							ipAddr, err := toIPAddr(addr)
+							ipAddrs, err := toIPAddrs([]ma.Multiaddr{addr})
 							if err != nil {
 								errs = append(errs, err)
 								continue
 							}
-							return ipAddr, nil
+							return ipAddrs[0], nil
 						}
 					}
 					if r.ip4Support {
 						for _, addr := range ip4Addrs {
-							ipAddr, err := toIPAddr(addr)
+							ipAddrs, err := toIPAddrs([]ma.Multiaddr{addr})
 							if err != nil {
 								errs = append(errs, err)
 								continue
 							}
-							return ipAddr, nil
+							return ipAddrs[0], nil
 						}
 					}
 					errs = append(errs, errors.New("could not get IP from address"))
@@ -347,7 +347,10 @@ func (r *P2PRouter) Lookup(ctx context.Context, key string, count int) (Balancer
 				}
 				peer := Peer{
 					Host:      addrInfo.ID.String(),
-					Addresses: []netip.AddrPort{netip.AddrPortFrom(ipAddr, r.registryPort)},
+					Addresses: []netip.Addr{ipAddr},
+					Metadata: PeerMetadata{
+						RegistryPort: r.registryPort,
+					},
 				}
 				cb.Add(peer)
 			}
@@ -412,44 +415,48 @@ func (r *P2PRouter) ListPeers() ([]Peer, error) {
 		if len(addrs) == 0 {
 			continue
 		}
-		peer := Peer{Host: id.String()}
-		for _, addr := range addrs {
-			ipAddr, err := toIPAddr(addr)
-			if err != nil {
-				continue
-			}
-			peer.Addresses = append(peer.Addresses, netip.AddrPortFrom(ipAddr, r.registryPort))
+		ipAddrs, err := toIPAddrs(addrs)
+		if err != nil {
+			return nil, err
 		}
-		if len(peer.Addresses) == 0 {
-			continue
+		peer := Peer{
+			Host:      id.String(),
+			Addresses: ipAddrs,
+			Metadata: PeerMetadata{
+				RegistryPort: r.registryPort,
+			},
 		}
 		peers = append(peers, peer)
 	}
 	return peers, nil
 }
 
-func (r *P2PRouter) LocalAddresses() []string {
-	localAddrs := []string{}
-	for _, addr := range r.host.Addrs() {
-		localAddr, err := toIPAddr(addr)
-		if err != nil {
-			continue
-		}
-		localAddrs = append(localAddrs, localAddr.String())
+func (r *P2PRouter) LocalAddresses() ([]netip.Addr, error) {
+	ipAddrs, err := toIPAddrs(r.host.Addrs())
+	if err != nil {
+		return nil, err
 	}
-	return localAddrs
+	return ipAddrs, nil
 }
 
-func toIPAddr(addr ma.Multiaddr) (netip.Addr, error) {
-	ip, err := manet.ToIP(addr)
-	if err != nil {
-		return netip.Addr{}, err
+func toIPAddrs(addrs []ma.Multiaddr) ([]netip.Addr, error) {
+	ipAddrs := []netip.Addr{}
+	existing := map[string]any{}
+	for _, addr := range addrs {
+		ip, err := manet.ToIP(addr)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := existing[ip.String()]; ok {
+			continue
+		}
+		ipAddr, ok := netip.AddrFromSlice(ip)
+		if !ok {
+			return nil, errors.New("could not convert to netip address")
+		}
+		ipAddrs = append(ipAddrs, ipAddr)
 	}
-	ipAddr, ok := netip.AddrFromSlice(ip)
-	if !ok {
-		return netip.Addr{}, errors.New("could not convert to netip address")
-	}
-	return ipAddr, nil
+	return ipAddrs, nil
 }
 
 func listenMultiaddrs(addr string) ([]ma.Multiaddr, error) {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"path"
 	"strconv"
@@ -289,7 +290,7 @@ func (r *Registry) mirrorHandler(rw httpx.ResponseWriter, req *http.Request, dis
 
 		mirror := &url.URL{
 			Scheme: "http",
-			Host:   peer.Addresses[0].String(),
+			Host:   netip.AddrPortFrom(peer.Addresses[0], peer.Metadata.RegistryPort).String(),
 		}
 		if req.TLS != nil {
 			mirror.Scheme = "https"
