@@ -4,28 +4,34 @@ import (
 	"context"
 	"errors"
 	"net/netip"
-	"slices"
 	"sync"
 )
 
+// ErrNoNext is returned when next will result in no new peer.
 var ErrNoNext = errors.New("no peers available for selection")
+
+// Peer represents a host reachable at one or more addresses.
+type Peer struct {
+	Host      string
+	Addresses []netip.AddrPort
+}
 
 // Balancer defines how peers looked up are returned.
 type Balancer interface {
 	// Next returns the next peer.
-	Next() (netip.AddrPort, error)
+	Next() (Peer, error)
 	// Size returns the amount of peers.
 	Size() int
 	// Add adds a peer to the balancer.
-	Add(netip.AddrPort)
+	Add(Peer)
 	// Remove removes the peer from the balancer.
-	Remove(netip.AddrPort)
+	Remove(Peer)
 }
 
 var _ Balancer = &RoundRobin{}
 
 type RoundRobin struct {
-	peers   []netip.AddrPort
+	peers   []Peer
 	nextIdx int
 	peerMx  sync.Mutex
 }
@@ -38,43 +44,49 @@ func (rr *RoundRobin) Size() int {
 	return len(rr.peers)
 }
 
-func (rr *RoundRobin) Add(item netip.AddrPort) {
+func (rr *RoundRobin) Add(peer Peer) {
 	rr.peerMx.Lock()
 	defer rr.peerMx.Unlock()
 
-	if slices.Contains(rr.peers, item) {
-		return
-	}
-	rr.peers = append(rr.peers, item)
-}
-
-func (rr *RoundRobin) Remove(item netip.AddrPort) {
-	rr.peerMx.Lock()
-	defer rr.peerMx.Unlock()
-
-	for i, v := range rr.peers {
-		if v == item {
-			rr.peers = append(rr.peers[:i], rr.peers[i+1:]...)
-			if rr.nextIdx > i {
-				rr.nextIdx--
-			} else if rr.nextIdx >= len(rr.peers) {
-				rr.nextIdx = 0
-			}
+	// Skip if already exists.
+	for _, p := range rr.peers {
+		if p.Host == peer.Host {
 			return
 		}
 	}
+
+	rr.peers = append(rr.peers, peer)
 }
 
-func (rr *RoundRobin) Next() (netip.AddrPort, error) {
+func (rr *RoundRobin) Remove(peer Peer) {
+	rr.peerMx.Lock()
+	defer rr.peerMx.Unlock()
+
+	for i, p := range rr.peers {
+		if p.Host != peer.Host {
+			continue
+		}
+
+		rr.peers = append(rr.peers[:i], rr.peers[i+1:]...)
+		if rr.nextIdx > i {
+			rr.nextIdx--
+		} else if rr.nextIdx >= len(rr.peers) {
+			rr.nextIdx = 0
+		}
+		return
+	}
+}
+
+func (rr *RoundRobin) Next() (Peer, error) {
 	rr.peerMx.Lock()
 	defer rr.peerMx.Unlock()
 
 	if len(rr.peers) == 0 {
-		return netip.AddrPort{}, ErrNoNext
+		return Peer{}, ErrNoNext
 	}
-	item := rr.peers[rr.nextIdx]
+	peer := rr.peers[rr.nextIdx]
 	rr.nextIdx = (rr.nextIdx + 1) % len(rr.peers)
-	return item, nil
+	return peer, nil
 }
 
 var _ Balancer = &ClosableBalancer{}
@@ -96,8 +108,8 @@ func NewClosableBalancer(balancer Balancer) *ClosableBalancer {
 	}
 }
 
-func (cb *ClosableBalancer) Add(item netip.AddrPort) {
-	cb.Balancer.Add(item)
+func (cb *ClosableBalancer) Add(peer Peer) {
+	cb.Balancer.Add(peer)
 
 	cb.waitersMx.Lock()
 	for _, ch := range cb.waiters {
@@ -107,7 +119,7 @@ func (cb *ClosableBalancer) Add(item netip.AddrPort) {
 	cb.waitersMx.Unlock()
 }
 
-func (cb *ClosableBalancer) Next() (netip.AddrPort, error) {
+func (cb *ClosableBalancer) Next() (Peer, error) {
 	for {
 		cb.waitersMx.Lock()
 		peer, err := cb.Balancer.Next()
@@ -118,14 +130,14 @@ func (cb *ClosableBalancer) Next() (netip.AddrPort, error) {
 
 			select {
 			case <-cb.closeCtx.Done():
-				return netip.AddrPort{}, ErrNoNext
+				return Peer{}, ErrNoNext
 			case <-ch:
 				continue
 			}
 		}
 		cb.waitersMx.Unlock()
 		if err != nil {
-			return netip.AddrPort{}, err
+			return Peer{}, err
 		}
 		return peer, nil
 	}

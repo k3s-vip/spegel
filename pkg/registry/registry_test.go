@@ -53,7 +53,11 @@ func TestRegistryOptions(t *testing.T) {
 func TestProbeHandlers(t *testing.T) {
 	t.Parallel()
 
-	router := routing.NewMemoryRouter(map[string][]netip.AddrPort{}, netip.MustParseAddrPort("127.0.0.1:8080"))
+	self := routing.Peer{
+		Host:      "test",
+		Addresses: []netip.AddrPort{netip.MustParseAddrPort("127.0.0.1:8080")},
+	}
+	router := routing.NewMemoryRouter(map[string][]routing.Peer{}, self)
 	reg, err := NewRegistry(nil, router)
 	require.NoError(t, err)
 	handler := reg.Handler(logr.Discard())
@@ -156,18 +160,24 @@ func TestBasicAuth(t *testing.T) {
 func TestRegistryHandler(t *testing.T) {
 	t.Parallel()
 
-	unreachableAddrPort := netip.MustParseAddrPort("127.0.0.1:0")
+	unreachablePeer := routing.Peer{
+		Host:      "unreachable",
+		Addresses: []netip.AddrPort{netip.MustParseAddrPort("127.0.0.1:0")},
+	}
 
-	badAddrPorts := []netip.AddrPort{}
-	for range 2 {
-		badReg, err := NewRegistry(oci.NewMemory(), routing.NewMemoryRouter(map[string][]netip.AddrPort{}, netip.AddrPort{}))
+	badPeers := []routing.Peer{}
+	for i := range 2 {
+		badReg, err := NewRegistry(oci.NewMemory(), routing.NewMemoryRouter(map[string][]routing.Peer{}, routing.Peer{}))
 		require.NoError(t, err)
 		badSvr := httptest.NewServer(badReg.Handler(logr.Discard()))
 		t.Cleanup(func() {
 			badSvr.Close()
 		})
-		badAddrPort := netip.MustParseAddrPort(badSvr.Listener.Addr().String())
-		badAddrPorts = append(badAddrPorts, badAddrPort)
+		peer := routing.Peer{
+			Host:      fmt.Sprintf("bad-%d", i),
+			Addresses: []netip.AddrPort{netip.MustParseAddrPort(badSvr.Listener.Addr().String())},
+		}
+		badPeers = append(badPeers, peer)
 	}
 
 	memStore := oci.NewMemory()
@@ -183,48 +193,54 @@ func TestRegistryHandler(t *testing.T) {
 	require.NoError(t, err)
 	err = memStore.Write(ocispec.Descriptor{Digest: digest.Digest("sha256:ac73670af3abed54ac6fb4695131f4099be9fbe39d6076c5d0264a6bbdae9d83"), MediaType: "application/vnd.oci.image.layer.v1.tar+gzip"}, []byte{0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 	require.NoError(t, err)
-	goodReg, err := NewRegistry(memStore, routing.NewMemoryRouter(map[string][]netip.AddrPort{}, netip.AddrPort{}))
+	goodReg, err := NewRegistry(memStore, routing.NewMemoryRouter(map[string][]routing.Peer{}, routing.Peer{}))
 	require.NoError(t, err)
 	goodSvr := httptest.NewServer(goodReg.Handler(logr.Discard()))
 	t.Cleanup(func() {
 		goodSvr.Close()
 	})
-	goodAddrPort := netip.MustParseAddrPort(goodSvr.Listener.Addr().String())
+	goodPeer := routing.Peer{
+		Host:      "good",
+		Addresses: []netip.AddrPort{netip.MustParseAddrPort(goodSvr.Listener.Addr().String())},
+	}
 
-	flakyAddrPorts := []netip.AddrPort{}
-	for range 3 {
+	flakyPeers := []routing.Peer{}
+	for i := range 3 {
 		flakyStore := &flakyStore{Memory: oci.NewMemory()}
 		err = flakyStore.Write(ocispec.Descriptor{Digest: digest.Digest("sha256:68a2f9c5f175c838c5e9433dfe7b9d3a73caade76b2185a8d9164405c5286edd"), MediaType: "dummy"}, []byte("Only a single peer"))
 		require.NoError(t, err)
 		err = flakyStore.Write(ocispec.Descriptor{Digest: digest.Digest("sha256:c8dc81dabe7ad5e801191aade7c87fb806d0ef9ce9b699d2e9598337f57f14d0"), MediaType: "dummy"}, []byte("Lorem Ipsum Dolor"))
 		require.NoError(t, err)
-		flakyReg, err := NewRegistry(flakyStore, routing.NewMemoryRouter(map[string][]netip.AddrPort{}, netip.AddrPort{}))
+		flakyReg, err := NewRegistry(flakyStore, routing.NewMemoryRouter(map[string][]routing.Peer{}, routing.Peer{}))
 		require.NoError(t, err)
 		flakySvr := httptest.NewServer(flakyReg.Handler(logr.Discard()))
 		t.Cleanup(func() {
 			flakySvr.Close()
 		})
-		flakyAddrPort := netip.MustParseAddrPort(flakySvr.Listener.Addr().String())
-		flakyAddrPorts = append(flakyAddrPorts, flakyAddrPort)
+		peer := routing.Peer{
+			Host:      fmt.Sprintf("flaky-%d", i),
+			Addresses: []netip.AddrPort{netip.MustParseAddrPort(flakySvr.Listener.Addr().String())},
+		}
+		flakyPeers = append(flakyPeers, peer)
 	}
 
-	resolver := map[string][]netip.AddrPort{
+	resolver := map[string][]routing.Peer{
 		// No working peers.
-		"sha256:18ca1296b9cc90d29b51b4a8724d97aa055102c3d74e53a8eafb3904c079c0c6": {badAddrPorts[0], unreachableAddrPort, badAddrPorts[1]},
+		"sha256:18ca1296b9cc90d29b51b4a8724d97aa055102c3d74e53a8eafb3904c079c0c6": {badPeers[0], unreachablePeer, badPeers[1]},
 		// First peer.
-		"sha256:0b7e0ac6364af64af017531f137a95f3a5b12ea38be0e74a860004d3e5760a67": {goodAddrPort, badAddrPorts[0], badAddrPorts[1]},
+		"sha256:0b7e0ac6364af64af017531f137a95f3a5b12ea38be0e74a860004d3e5760a67": {goodPeer, badPeers[0], badPeers[1]},
 		// Second peer.
-		"sha256:431491e49ba5fa61930417a46b24c03b6df0b426b90009405457741ac52f44b2": {unreachableAddrPort, goodAddrPort},
+		"sha256:431491e49ba5fa61930417a46b24c03b6df0b426b90009405457741ac52f44b2": {unreachablePeer, goodPeer},
 		// Last peer working.
-		"sha256:7d66cda2ba857d07e5530e53565b7d56b10ab80d16b6883fff8478327a49b4ba": {badAddrPorts[0], badAddrPorts[1], goodAddrPort},
+		"sha256:7d66cda2ba857d07e5530e53565b7d56b10ab80d16b6883fff8478327a49b4ba": {badPeers[0], badPeers[1], goodPeer},
 		// Valid manifest and blob.
-		"sha256:dff9de10919148711140d349bf03f1a99eb06f94b03e51715ccebfa7cdc518e2": {goodAddrPort},
-		"sha256:ac73670af3abed54ac6fb4695131f4099be9fbe39d6076c5d0264a6bbdae9d83": {goodAddrPort},
+		"sha256:dff9de10919148711140d349bf03f1a99eb06f94b03e51715ccebfa7cdc518e2": {goodPeer},
+		"sha256:ac73670af3abed54ac6fb4695131f4099be9fbe39d6076c5d0264a6bbdae9d83": {goodPeer},
 		// Flaky content.
-		"sha256:68a2f9c5f175c838c5e9433dfe7b9d3a73caade76b2185a8d9164405c5286edd": {flakyAddrPorts[0]},
-		"sha256:c8dc81dabe7ad5e801191aade7c87fb806d0ef9ce9b699d2e9598337f57f14d0": flakyAddrPorts,
+		"sha256:68a2f9c5f175c838c5e9433dfe7b9d3a73caade76b2185a8d9164405c5286edd": {flakyPeers[0]},
+		"sha256:c8dc81dabe7ad5e801191aade7c87fb806d0ef9ce9b699d2e9598337f57f14d0": flakyPeers,
 	}
-	router := routing.NewMemoryRouter(resolver, netip.AddrPort{})
+	router := routing.NewMemoryRouter(resolver, routing.Peer{})
 	reg, err := NewRegistry(oci.NewMemory(), router, WithRegistryFilters([]oci.Filter{oci.RegexFilter{Regex: regexp.MustCompile(`:latest$`)}}))
 	require.NoError(t, err)
 	handler := reg.Handler(logr.Discard())

@@ -127,10 +127,12 @@ func TestP2PRouter(t *testing.T) {
 	for _, r := range routers {
 		bal, err = r.Lookup(t.Context(), advertisedKey, 3)
 		require.NoError(t, err)
-		addrPort, err := bal.Next()
+		peer, err := bal.Next()
 		require.NoError(t, err)
-		require.Equal(t, primaryIP.String(), addrPort.Addr().String())
-		require.Equal(t, uint16(9091), addrPort.Port())
+		require.Equal(t, primaryRouter.host.ID().String(), peer.Host)
+		require.Len(t, peer.Addresses, 1)
+		require.Equal(t, primaryIP.String(), peer.Addresses[0].Addr().String())
+		require.Equal(t, uint16(9091), peer.Addresses[0].Port())
 
 		bal, err = r.Lookup(t.Context(), "wont find key", 3)
 		require.NoError(t, err)
@@ -153,9 +155,11 @@ func TestP2PRouter(t *testing.T) {
 
 	bal, err = primaryRouter.Lookup(t.Context(), newKey, 3)
 	require.NoError(t, err)
-	addrPort, err := bal.Next()
+	peer, err := bal.Next()
 	require.NoError(t, err)
-	require.Equal(t, lastIP.String(), addrPort.Addr().String())
+	require.Equal(t, lastRouter.host.ID().String(), peer.Host)
+	require.Len(t, peer.Addresses, 1)
+	require.Equal(t, lastIP.String(), peer.Addresses[0].Addr().String())
 
 	// Shutdown should complete without errors.
 	cancel()

@@ -95,7 +95,11 @@ func TestTrack(t *testing.T) {
 			ctx := logr.NewContext(t.Context(), log)
 			ctx, cancel := context.WithCancel(ctx)
 
-			router := routing.NewMemoryRouter(map[string][]netip.AddrPort{}, netip.MustParseAddrPort("127.0.0.1:5000"))
+			self := routing.Peer{
+				Host:      "test",
+				Addresses: []netip.AddrPort{netip.MustParseAddrPort("127.0.0.1:5000")},
+			}
+			router := routing.NewMemoryRouter(map[string][]routing.Peer{}, self)
 			g, gCtx := errgroup.WithContext(ctx)
 			g.Go(func() error {
 				return Track(gCtx, ociStore, router, WithRegistryFilters(tt.registryFilters))

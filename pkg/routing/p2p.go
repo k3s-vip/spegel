@@ -345,7 +345,10 @@ func (r *P2PRouter) Lookup(ctx context.Context, key string, count int) (Balancer
 					log.Error(err, "no suitable IP address found for peer")
 					continue
 				}
-				peer := netip.AddrPortFrom(ipAddr, r.registryPort)
+				peer := Peer{
+					Host:      addrInfo.ID.String(),
+					Addresses: []netip.AddrPort{netip.AddrPortFrom(ipAddr, r.registryPort)},
+				}
 				cb.Add(peer)
 			}
 		}()
@@ -401,11 +404,6 @@ func (r *P2PRouter) Withdraw(ctx context.Context, keys []string) error {
 	return nil
 }
 
-type Peer struct {
-	ID        string
-	Addresses []string
-}
-
 func (r *P2PRouter) ListPeers() ([]Peer, error) {
 	peers := []Peer{}
 	ids := r.kdht.RoutingTable().ListPeers()
@@ -414,13 +412,13 @@ func (r *P2PRouter) ListPeers() ([]Peer, error) {
 		if len(addrs) == 0 {
 			continue
 		}
-		peer := Peer{ID: id.String()}
+		peer := Peer{Host: id.String()}
 		for _, addr := range addrs {
 			ipAddr, err := toIPAddr(addr)
 			if err != nil {
 				continue
 			}
-			peer.Addresses = append(peer.Addresses, ipAddr.String())
+			peer.Addresses = append(peer.Addresses, netip.AddrPortFrom(ipAddr, r.registryPort))
 		}
 		if len(peer.Addresses) == 0 {
 			continue

@@ -2,7 +2,6 @@ package routing
 
 import (
 	"context"
-	"net/netip"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -11,13 +10,13 @@ import (
 var _ Router = &MemoryRouter{}
 
 type MemoryRouter struct {
-	resolver map[string][]netip.AddrPort
-	self     netip.AddrPort
+	resolver map[string][]Peer
+	self     Peer
 	ready    atomic.Bool
 	mx       sync.RWMutex
 }
 
-func NewMemoryRouter(resolver map[string][]netip.AddrPort, self netip.AddrPort) *MemoryRouter {
+func NewMemoryRouter(resolver map[string][]Peer, self Peer) *MemoryRouter {
 	r := &MemoryRouter{
 		resolver: resolver,
 		self:     self,
@@ -64,40 +63,41 @@ func (m *MemoryRouter) Withdraw(ctx context.Context, keys []string) error {
 	return nil
 }
 
-func (m *MemoryRouter) Add(key string, ap netip.AddrPort) {
+func (m *MemoryRouter) Add(key string, peer Peer) {
 	m.mx.Lock()
 	defer m.mx.Unlock()
 
-	v, ok := m.resolver[key]
+	peers, ok := m.resolver[key]
 	if !ok {
-		m.resolver[key] = []netip.AddrPort{ap}
+		m.resolver[key] = []Peer{peer}
 		return
 	}
-	if slices.Contains(v, ap) {
-		return
+	for _, p := range peers {
+		if p.Host == peer.Host {
+			return
+		}
 	}
-	m.resolver[key] = append(v, ap)
+	m.resolver[key] = append(peers, peer)
 }
 
-func (m *MemoryRouter) Delete(key string, ap netip.AddrPort) {
+func (m *MemoryRouter) Delete(key string, peer Peer) {
 	m.mx.Lock()
 	defer m.mx.Unlock()
 
-	v, ok := m.resolver[key]
+	peers, ok := m.resolver[key]
 	if !ok {
 		return
 	}
-	i := slices.Index(v, ap)
-	if i == -1 {
-		return
-	}
-	m.resolver[key] = slices.Delete(v, i, i+1)
+	peers = slices.DeleteFunc(peers, func(v Peer) bool {
+		return v.Host == peer.Host
+	})
+	m.resolver[key] = peers
 }
 
-func (m *MemoryRouter) Get(key string) ([]netip.AddrPort, bool) {
+func (m *MemoryRouter) Get(key string) ([]Peer, bool) {
 	m.mx.RLock()
 	defer m.mx.RUnlock()
 
-	v, ok := m.resolver[key]
-	return v, ok
+	peers, ok := m.resolver[key]
+	return peers, ok
 }

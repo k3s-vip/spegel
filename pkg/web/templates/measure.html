@@ -12,7 +12,7 @@
 
     {{ range .LookupResults }}
     <tr>
-      <td>{{ .Peer.Addr }}</td>
+      <td>{{ .Peer.Host }}</td>
       <td>{{ .Duration | formatDuration }}</td>
     </tr>
     {{ end }}
