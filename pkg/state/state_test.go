@@ -97,7 +97,10 @@ func TestTrack(t *testing.T) {
 
 			self := routing.Peer{
 				Host:      "test",
-				Addresses: []netip.AddrPort{netip.MustParseAddrPort("127.0.0.1:5000")},
+				Addresses: []netip.Addr{netip.MustParseAddr("127.0.0.1")},
+				Metadata: routing.PeerMetadata{
+					RegistryPort: 5000,
+				},
 			}
 			router := routing.NewMemoryRouter(map[string][]routing.Peer{}, self)
 			g, gCtx := errgroup.WithContext(ctx)

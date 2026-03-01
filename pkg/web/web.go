@@ -7,6 +7,7 @@ import (
 	"errors"
 	"html/template"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 	"time"
@@ -129,7 +130,7 @@ func (w *Web) metaDataHandler(rw httpx.ResponseWriter, req *http.Request) {
 
 func (w *Web) statsHandler(rw httpx.ResponseWriter, req *http.Request) {
 	data := struct {
-		LocalAddresses    []string
+		LocalAddresses    []netip.Addr
 		Images            []oci.Image
 		Peers             []routing.Peer
 		MirrorLastSuccess time.Duration
@@ -153,7 +154,12 @@ func (w *Web) statsHandler(rw httpx.ResponseWriter, req *http.Request) {
 		data.MirrorLastSuccess = time.Since(time.Unix(mirrorLastSuccess, 0))
 	}
 
-	data.LocalAddresses = w.router.LocalAddresses()
+	localAddrs, err := w.router.LocalAddresses()
+	if err != nil {
+		rw.WriteError(http.StatusInternalServerError, err)
+		return
+	}
+	data.LocalAddresses = localAddrs
 	peers, err := w.router.ListPeers()
 	if err != nil {
 		rw.WriteError(http.StatusInternalServerError, err)

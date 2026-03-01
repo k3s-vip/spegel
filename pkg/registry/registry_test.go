@@ -55,7 +55,10 @@ func TestProbeHandlers(t *testing.T) {
 
 	self := routing.Peer{
 		Host:      "test",
-		Addresses: []netip.AddrPort{netip.MustParseAddrPort("127.0.0.1:8080")},
+		Addresses: []netip.Addr{netip.MustParseAddr("127.0.0.1")},
+		Metadata: routing.PeerMetadata{
+			RegistryPort: 8080,
+		},
 	}
 	router := routing.NewMemoryRouter(map[string][]routing.Peer{}, self)
 	reg, err := NewRegistry(nil, router)
@@ -162,7 +165,10 @@ func TestRegistryHandler(t *testing.T) {
 
 	unreachablePeer := routing.Peer{
 		Host:      "unreachable",
-		Addresses: []netip.AddrPort{netip.MustParseAddrPort("127.0.0.1:0")},
+		Addresses: []netip.Addr{netip.MustParseAddr("127.0.0.1")},
+		Metadata: routing.PeerMetadata{
+			RegistryPort: 0,
+		},
 	}
 
 	badPeers := []routing.Peer{}
@@ -173,9 +179,13 @@ func TestRegistryHandler(t *testing.T) {
 		t.Cleanup(func() {
 			badSvr.Close()
 		})
+		addrPort := netip.MustParseAddrPort(badSvr.Listener.Addr().String())
 		peer := routing.Peer{
 			Host:      fmt.Sprintf("bad-%d", i),
-			Addresses: []netip.AddrPort{netip.MustParseAddrPort(badSvr.Listener.Addr().String())},
+			Addresses: []netip.Addr{addrPort.Addr()},
+			Metadata: routing.PeerMetadata{
+				RegistryPort: addrPort.Port(),
+			},
 		}
 		badPeers = append(badPeers, peer)
 	}
@@ -199,9 +209,13 @@ func TestRegistryHandler(t *testing.T) {
 	t.Cleanup(func() {
 		goodSvr.Close()
 	})
+	addrPort := netip.MustParseAddrPort(goodSvr.Listener.Addr().String())
 	goodPeer := routing.Peer{
 		Host:      "good",
-		Addresses: []netip.AddrPort{netip.MustParseAddrPort(goodSvr.Listener.Addr().String())},
+		Addresses: []netip.Addr{addrPort.Addr()},
+		Metadata: routing.PeerMetadata{
+			RegistryPort: addrPort.Port(),
+		},
 	}
 
 	flakyPeers := []routing.Peer{}
@@ -217,9 +231,13 @@ func TestRegistryHandler(t *testing.T) {
 		t.Cleanup(func() {
 			flakySvr.Close()
 		})
+		addrPort := netip.MustParseAddrPort(flakySvr.Listener.Addr().String())
 		peer := routing.Peer{
 			Host:      fmt.Sprintf("flaky-%d", i),
-			Addresses: []netip.AddrPort{netip.MustParseAddrPort(flakySvr.Listener.Addr().String())},
+			Addresses: []netip.Addr{addrPort.Addr()},
+			Metadata: routing.PeerMetadata{
+				RegistryPort: addrPort.Port(),
+			},
 		}
 		flakyPeers = append(flakyPeers, peer)
 	}

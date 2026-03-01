@@ -131,8 +131,7 @@ func TestP2PRouter(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, primaryRouter.host.ID().String(), peer.Host)
 		require.Len(t, peer.Addresses, 1)
-		require.Equal(t, primaryIP.String(), peer.Addresses[0].Addr().String())
-		require.Equal(t, uint16(9091), peer.Addresses[0].Port())
+		require.Equal(t, primaryIP.String(), peer.Addresses[0].String())
 
 		bal, err = r.Lookup(t.Context(), "wont find key", 3)
 		require.NoError(t, err)
@@ -159,7 +158,7 @@ func TestP2PRouter(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, lastRouter.host.ID().String(), peer.Host)
 	require.Len(t, peer.Addresses, 1)
-	require.Equal(t, lastIP.String(), peer.Addresses[0].Addr().String())
+	require.Equal(t, lastIP.String(), peer.Addresses[0].String())
 
 	// Shutdown should complete without errors.
 	cancel()
@@ -317,6 +316,7 @@ func TestLocalAddress(t *testing.T) {
 	router, err := NewP2PRouter(t.Context(), ":0", bs, "9090")
 	require.NoError(t, err)
 
-	localAddrs := router.LocalAddresses()
-	require.NotEmpty(t, localAddrs, "LocalAddress should return a non-empty address")
+	ipAddrs, err := router.LocalAddresses()
+	require.NoError(t, err)
+	require.NotEmpty(t, ipAddrs)
 }
