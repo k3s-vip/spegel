@@ -7,7 +7,6 @@ import (
 	"errors"
 	"html/template"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"strings"
 	"time"
@@ -178,7 +177,7 @@ type measureResult struct {
 }
 
 type lookupResult struct {
-	Peer     netip.AddrPort
+	Peer     routing.Peer
 	Duration time.Duration
 }
 

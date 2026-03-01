@@ -10,7 +10,7 @@ import (
 func TestMemoryRouter(t *testing.T) {
 	t.Parallel()
 
-	r := NewMemoryRouter(map[string][]netip.AddrPort{}, netip.AddrPort{})
+	r := NewMemoryRouter(map[string][]Peer{}, Peer{})
 
 	isReady, err := r.Ready(t.Context())
 	require.NoError(t, err)
@@ -23,10 +23,14 @@ func TestMemoryRouter(t *testing.T) {
 
 	err = r.Advertise(t.Context(), []string{"foo"})
 	require.NoError(t, err)
-	r.Add("foo", netip.MustParseAddrPort("127.0.0.1:9090"))
+	addPeer := Peer{
+		Host:      "test",
+		Addresses: []netip.AddrPort{netip.MustParseAddrPort("127.0.0.1:9090")},
+	}
+	r.Add("foo", addPeer)
 	rr, err := r.Lookup(t.Context(), "foo", 2)
 	require.NoError(t, err)
-	peers := []netip.AddrPort{}
+	peers := []Peer{}
 	for range 2 {
 		peer, err := rr.Next()
 		require.NoError(t, err)

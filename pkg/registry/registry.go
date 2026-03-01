@@ -289,7 +289,7 @@ func (r *Registry) mirrorHandler(rw httpx.ResponseWriter, req *http.Request, dis
 
 		mirror := &url.URL{
 			Scheme: "http",
-			Host:   peer.String(),
+			Host:   peer.Addresses[0].String(),
 		}
 		if req.TLS != nil {
 			mirror.Scheme = "https"
