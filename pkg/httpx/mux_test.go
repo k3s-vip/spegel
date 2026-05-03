@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	"github.com/go-openapi/testify/v2/require"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
-	"github.com/stretchr/testify/require"
 )
 
 func TestServeMux(t *testing.T) {

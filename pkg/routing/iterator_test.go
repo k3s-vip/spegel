@@ -6,7 +6,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/go-openapi/testify/v2/require"
 
 	"github.com/spegel-org/spegel/internal/testutil"
 )

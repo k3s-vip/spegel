@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/go-openapi/testify/v2/require"
 
 	"github.com/spegel-org/spegel/pkg/httpx"
 	"github.com/spegel-org/spegel/pkg/oci"

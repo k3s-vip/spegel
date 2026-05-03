@@ -5,7 +5,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/go-openapi/testify/v2/require"
 )
 
 func TestHedger(t *testing.T) {

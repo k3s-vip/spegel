@@ -15,11 +15,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fluxcd/cli-utils/pkg/kstatus/status"
-	"github.com/moby/moby/client"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/fluxcd/cli-utils/pkg/kstatus/status"
+	"github.com/go-openapi/testify/v2/assert"
+	"github.com/go-openapi/testify/v2/require"
+	"github.com/moby/moby/client"
 	"helm.sh/helm/v4/pkg/action"
 	"helm.sh/helm/v4/pkg/chart/loader"
 	"helm.sh/helm/v4/pkg/downloader"
@@ -321,7 +322,7 @@ func TestKubernetes(t *testing.T) {
 
 			err = k8sClient.CoreV1().Pods(spegelNamespace).Delete(t.Context(), initPodName, metav1.DeleteOptions{})
 			require.NoError(t, err)
-			require.EventuallyWithT(t, func(c *assert.CollectT) {
+			require.EventuallyWith(t, func(c *assert.CollectT) {
 				_, err := k8sClient.CoreV1().Pods(spegelNamespace).Get(t.Context(), initPodName, metav1.GetOptions{})
 				require.True(c, kerrors.IsNotFound(err))
 			}, 15*time.Second, 1*time.Second)
@@ -363,7 +364,7 @@ func TestKubernetes(t *testing.T) {
 			require.Len(t, podList.Items, 1)
 			err = kindNodes[0].CommandContext(t.Context(), "systemctl", "restart", "containerd").Run()
 			require.NoError(t, err)
-			require.EventuallyWithT(t, func(c *assert.CollectT) {
+			require.EventuallyWith(t, func(c *assert.CollectT) {
 				pod, err := k8sClient.CoreV1().Pods(spegelNamespace).Get(t.Context(), podList.Items[0].Name, metav1.GetOptions{})
 				require.NoError(c, err)
 				require.Len(c, pod.Status.ContainerStatuses, 1)
@@ -380,7 +381,7 @@ func TestKubernetes(t *testing.T) {
 			require.NoError(t, err)
 			err = k8sClient.CoreV1().Pods(spegelNamespace).DeleteCollection(t.Context(), metav1.DeleteOptions{}, metav1.ListOptions{})
 			require.NoError(t, err)
-			require.EventuallyWithT(t, func(c *assert.CollectT) {
+			require.EventuallyWith(t, func(c *assert.CollectT) {
 				for _, pod := range podList.Items {
 					_, err := k8sClient.CoreV1().Pods(spegelNamespace).Get(t.Context(), pod.Name, metav1.GetOptions{})
 					require.True(c, kerrors.IsNotFound(err))
@@ -483,7 +484,7 @@ func installSpegel(t *testing.T, actionCfg *action.Configuration, k8sClient kube
 func waitForStatus(t *testing.T, k8sDynClient dynamic.Interface, gvr schema.GroupVersionResource, namespace, name string, s status.Status) {
 	t.Helper()
 
-	require.EventuallyWithT(t, func(c *assert.CollectT) {
+	require.EventuallyWith(t, func(c *assert.CollectT) {
 		u, err := k8sDynClient.Resource(gvr).Namespace(namespace).Get(t.Context(), name, metav1.GetOptions{})
 		require.NoError(c, err)
 		require.NotNil(t, status.GetLegacyConditionsFn(u))
@@ -613,7 +614,7 @@ func runPullTests(t *testing.T, k8sClient kubernetes.Interface, k8sDynClient dyn
 		for _, readyPod := range readyPods {
 			waitForStatus(t, k8sDynClient, gvr, pullTestNamespace, readyPod.Name, status.CurrentStatus)
 		}
-		require.EventuallyWithT(t, func(c *assert.CollectT) {
+		require.EventuallyWith(t, func(c *assert.CollectT) {
 			pod, err := k8sClient.CoreV1().Pods(pullTestNamespace).Get(t.Context(), failedPod.Name, metav1.GetOptions{})
 			require.NoError(t, err)
 			require.Len(c, pod.Status.ContainerStatuses, 1)
@@ -737,7 +738,7 @@ func runConformanceTests(t *testing.T, k8sClient kubernetes.Interface, kindNodes
 			dumpPods(t, k8sClient, conformanceNamespace, true)
 		})
 
-		require.EventuallyWithT(t, func(c *assert.CollectT) {
+		require.EventuallyWith(t, func(c *assert.CollectT) {
 			job, err := k8sClient.BatchV1().Jobs(conformanceNamespace).Get(t.Context(), job.Name, metav1.GetOptions{})
 			require.NoError(c, err)
 			require.Equal(c, int32(0), job.Status.Failed)

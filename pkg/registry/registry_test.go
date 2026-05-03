@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	"github.com/go-openapi/testify/v2/require"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 
 	"github.com/spegel-org/spegel/internal/option"

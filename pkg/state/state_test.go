@@ -16,10 +16,10 @@ import (
 
 	"github.com/go-logr/logr"
 	tlog "github.com/go-logr/logr/testing"
+	"github.com/go-openapi/testify/v2/require"
 	"github.com/opencontainers/go-digest"
 	"github.com/opencontainers/image-spec/specs-go"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/stretchr/testify/require"
 
 	"github.com/spegel-org/spegel/pkg/oci"
 	"github.com/spegel-org/spegel/pkg/routing"

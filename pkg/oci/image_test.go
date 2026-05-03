@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/go-openapi/testify/v2/require"
 	digest "github.com/opencontainers/go-digest"
-	"github.com/stretchr/testify/require"
 )
 
 func TestParseImageStrict(t *testing.T) {
