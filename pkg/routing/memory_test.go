@@ -4,7 +4,7 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/go-openapi/testify/v2/require"
 )
 
 func TestMemoryRouter(t *testing.T) {

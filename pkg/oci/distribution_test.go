@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/go-openapi/testify/v2/require"
 	"github.com/opencontainers/go-digest"
-	"github.com/stretchr/testify/require"
 
 	"github.com/spegel-org/spegel/internal/ptr"
 	"github.com/spegel-org/spegel/pkg/httpx"

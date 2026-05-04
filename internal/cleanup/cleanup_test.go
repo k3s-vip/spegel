@@ -11,7 +11,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/stretchr/testify/require"
+	"github.com/go-openapi/testify/v2/require"
 )
 
 func TestCleanupFail(t *testing.T) {

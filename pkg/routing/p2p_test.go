@@ -9,13 +9,13 @@ import (
 
 	"github.com/go-logr/logr"
 	tlog "github.com/go-logr/logr/testing"
+	"github.com/go-openapi/testify/v2/assert"
+	"github.com/go-openapi/testify/v2/require"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/spegel-org/spegel/internal/option"
 )
@@ -104,7 +104,7 @@ func TestP2PRouter(t *testing.T) {
 	ready, err = primaryRouter.Ready(t.Context())
 	require.NoError(t, err)
 	require.True(t, ready)
-	require.EventuallyWithT(t, func(c *assert.CollectT) {
+	require.EventuallyWith(t, func(c *assert.CollectT) {
 		require.Equal(c, int64(1), primaryRouter.prov.Stats().Operations.Past.KeysProvided)
 	}, 5*time.Second, time.Second)
 
@@ -149,7 +149,7 @@ func TestP2PRouter(t *testing.T) {
 	err = lastRouter.Advertise(t.Context(), []string{newKey})
 	require.NoError(t, err)
 
-	require.EventuallyWithT(t, func(c *assert.CollectT) {
+	require.EventuallyWith(t, func(c *assert.CollectT) {
 		require.Equal(c, int64(1), lastRouter.prov.Stats().Operations.Past.KeysProvided)
 	}, 5*time.Second, 1*time.Second)
 
@@ -193,7 +193,7 @@ func TestProvideTTL(t *testing.T) {
 	// Advertise a key that is expected to expire.
 	err := routers[0].Advertise(t.Context(), []string{"foo"})
 	require.NoError(t, err)
-	require.EventuallyWithT(t, func(c *assert.CollectT) {
+	require.EventuallyWith(t, func(c *assert.CollectT) {
 		require.Equal(c, int64(1), routers[0].prov.Stats().Operations.Past.KeysProvided)
 	}, 5*time.Second, time.Second)
 	err = routers[0].Withdraw(t.Context(), []string{"foo"})

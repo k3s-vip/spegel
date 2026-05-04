@@ -3,7 +3,7 @@ package testutil
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/go-openapi/testify/v2/require"
 )
 
 func RequireChannelReceive[T any](t *testing.T, ch <-chan T) {

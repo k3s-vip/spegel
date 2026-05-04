@@ -10,7 +10,7 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/go-openapi/testify/v2/require"
 )
 
 func TestHappyEyeballs(t *testing.T) {

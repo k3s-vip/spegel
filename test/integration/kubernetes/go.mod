@@ -8,9 +8,9 @@ replace github.com/spegel-org/spegel => ../../../
 
 require (
 	github.com/fluxcd/cli-utils v1.1.0
+	github.com/go-openapi/testify/v2 v2.5.0
 	github.com/moby/moby/client v0.4.1
 	github.com/spegel-org/spegel v0.0.0-00010101000000-000000000000
-	github.com/stretchr/testify v1.11.1
 	golang.org/x/sync v0.20.0
 	helm.sh/helm/v4 v4.1.4
 	k8s.io/api v0.36.0

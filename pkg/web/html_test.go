@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/go-openapi/testify/v2/require"
 )
 
 func TestHTMLResponseError(t *testing.T) {

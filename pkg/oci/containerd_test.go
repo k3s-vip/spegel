@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/go-logr/logr"
+	"github.com/go-openapi/testify/v2/require"
 	"github.com/opencontainers/go-digest"
-	"github.com/stretchr/testify/require"
 )
 
 func TestBackupConfig(t *testing.T) {

@@ -8,11 +8,11 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/go-openapi/testify/v2/require"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/miekg/dns"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
-	"github.com/stretchr/testify/require"
 )
 
 func TestStaticBootstrap(t *testing.T) {

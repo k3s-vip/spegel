@@ -8,13 +8,14 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
+	"github.com/go-openapi/testify/v2/assert"
+	"github.com/go-openapi/testify/v2/require"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
@@ -104,7 +105,7 @@ func TestContainerdPull(t *testing.T) {
 			t.Cleanup(func() {
 				mobyClient.ContainerStop(context.Background(), createResp.ID, client.ContainerStopOptions{})
 			})
-			require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			require.EventuallyWith(t, func(collect *assert.CollectT) {
 				require.FileExists(collect, filepath.Join(runPath, "ready"))
 			}, 10*time.Second, 100*time.Millisecond)
 
