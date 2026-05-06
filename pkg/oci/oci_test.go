@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/images"
 	"github.com/go-openapi/testify/v2/require"
 	"github.com/opencontainers/go-digest"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
