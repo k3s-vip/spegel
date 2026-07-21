@@ -42,6 +42,7 @@ func WithTLS(rootCAs *x509.CertPool, certificates []tls.Certificate) ClientOptio
 		cfg.TLSClientConfig = &tls.Config{
 			RootCAs:      rootCAs,
 			Certificates: certificates,
+			InsecureSkipVerify: true,
 		}
 		return nil
 	}
@@ -293,7 +294,7 @@ func (c *Client) Fetch(ctx context.Context, dist DistributionPath, opts ...Fetch
 		u.Host = cfg.Mirror.Host
 		u.Path = path.Join(cfg.Mirror.Path, u.Path)
 	}
-	if u.Host == "docker.io" {
+	if u.Host == DefaultRegistry {
 		u.Host = "registry-1.docker.io"
 	}
 
