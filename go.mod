@@ -6,8 +6,8 @@ require (
 	cuelabs.dev/go/oci/ociregistry v0.0.0-20250530080122-d0efc28a5723
 	github.com/HdrHistogram/hdrhistogram-go v1.4.0
 	github.com/alexflint/go-arg v1.6.1
+	github.com/containerd/containerd v1.7.36
 	github.com/containerd/containerd/api v1.10.0
-	github.com/containerd/containerd/v2 v2.1.9
 	github.com/containerd/errdefs v1.0.0
 	github.com/containerd/platforms v1.0.0-rc.5
 	github.com/containerd/typeurl/v2 v2.3.0
@@ -49,7 +49,6 @@ require (
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/fifo v1.1.0 // indirect
 	github.com/containerd/log v0.2.0 // indirect
-	github.com/containerd/plugin v1.1.0 // indirect
 	github.com/containerd/ttrpc v1.2.9 // indirect
 	github.com/cyphar/filepath-securejoin v0.5.2 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
