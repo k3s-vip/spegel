@@ -1,8 +1,6 @@
 package containerd
 
 import (
-	"maps"
-
 	"github.com/opencontainers/go-digest"
 
 	"github.com/spegel-org/spegel/pkg/oci"
@@ -56,24 +54,10 @@ func (idx *Index) AddContent(dgst digest.Digest) []store.Event {
 	return []store.Event{{Type: store.CreateEvent, Digest: dgst}}
 }
 
-func (idx *Index) DiffContent(dgsts []digest.Digest) []store.Event {
-	events := []store.Event{}
-	contents := map[digest.Digest]any{}
-	deleted := maps.Clone(idx.contents)
-
-	for _, dgst := range dgsts {
-		if _, ok := deleted[dgst]; ok {
-			delete(deleted, dgst)
-		} else {
-			events = append(events, store.Event{Type: store.CreateEvent, Digest: dgst})
-		}
-		contents[dgst] = nil
+func (idx *Index) RemoveContent(dgst digest.Digest) []store.Event {
+	if _, ok := idx.contents[dgst]; !ok {
+		return nil
 	}
-	for dgst := range deleted {
-		events = append(events, store.Event{Type: store.DeleteEvent, Digest: dgst})
-	}
-
-	idx.contents = contents
-
-	return events
+	delete(idx.contents, dgst)
+	return []store.Event{{Type: store.DeleteEvent, Digest: dgst}}
 }

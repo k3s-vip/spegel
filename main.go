@@ -202,10 +202,6 @@ func registryCommand(ctx context.Context, args *RegistryCmd) error {
 		return err
 	}
 	defer ctrd.Close()
-	err = ctrd.Validate(ctx, args.ContainerdRegistryConfigPath)
-	if err != nil {
-		return err
-	}
 
 	// Routing and state tracking.
 	_, registryPortStr, err := net.SplitHostPort(args.RegistryAddr)

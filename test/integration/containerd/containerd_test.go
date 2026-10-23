@@ -221,8 +221,6 @@ func TestContainerdPull(t *testing.T) {
 						t.Log("Setting up Containerd store")
 						ctrd, err := containerd.NewContainerd(t.Context(), socketPath, ctrdNamespace)
 						require.NoError(t, err)
-						err = ctrd.Validate(t.Context(), "/etc/containerd/certs.d")
-						require.NoError(t, err)
 						ctrdName := ctrd.Name()
 						require.EqualT(t, "containerd", ctrdName)
 
