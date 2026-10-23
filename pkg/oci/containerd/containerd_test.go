@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/v2/core/events"
-	"github.com/containerd/containerd/v2/core/images"
+	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/typeurl/v2"
 	"github.com/go-openapi/testify/v2/require"
 	"github.com/opencontainers/go-digest"

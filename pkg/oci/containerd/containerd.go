@@ -9,12 +9,11 @@ import (
 	"os"
 	"path/filepath"
 
+	client "github.com/containerd/containerd"
 	eventtypes "github.com/containerd/containerd/api/events"
-	"github.com/containerd/containerd/v2/client"
-	"github.com/containerd/containerd/v2/core/content"
-	"github.com/containerd/containerd/v2/core/events"
-	"github.com/containerd/containerd/v2/core/images"
-	"github.com/containerd/containerd/v2/plugins"
+	"github.com/containerd/containerd/content"
+	"github.com/containerd/containerd/events"
+	"github.com/containerd/containerd/images"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/typeurl/v2"
 	"github.com/go-logr/logr"
@@ -82,14 +81,14 @@ func NewContainerd(ctx context.Context, socketPath, namespace string, opts ...Co
 		return nil, errors.New("namespace must not be empty")
 	}
 
-	clientOpts := []client.Opt{
+	clientOpts := []client.ClientOpt{
 		client.WithDefaultNamespace(namespace),
 	}
 	if cfg.Conn != nil {
 		dialOpt := grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return cfg.Conn, nil
 		})
-		clientOpts = append(clientOpts, client.WithExtraDialOpts([]grpc.DialOption{dialOpt}))
+		clientOpts = append(clientOpts, client.WithDialOpts([]grpc.DialOption{dialOpt}))
 	}
 	client, err := client.New(socketPath, clientOpts...)
 	if err != nil {
@@ -97,13 +96,6 @@ func NewContainerd(ctx context.Context, socketPath, namespace string, opts ...Co
 	}
 
 	contentPath := cfg.ContentPath
-	if contentPath == "" {
-		contentPath, err = getContentPath(ctx, client)
-		if err != nil {
-			client.Close()
-			return nil, err
-		}
-	}
 
 	manifestIdx, err := lru.New[digest.Digest, []digest.Digest](2000)
 	if err != nil {
@@ -260,7 +252,6 @@ func (c *Containerd) Watch(ctx context.Context) ([]store.Event, <-chan store.Eve
 	eventFilters := []string{
 		fmt.Sprintf(`namespace==%q,topic~="/images/create|/images/update",event.name~="^.+/"`, c.namespace),
 		fmt.Sprintf(`namespace==%q,topic~="/images/delete"`, c.namespace),
-		fmt.Sprintf(`namespace==%q,topic~="/content/create"`, c.namespace),
 		fmt.Sprintf(`namespace==%q,topic~="/content/delete"`, c.namespace),
 	}
 	envelopeCh, cErrCh := c.client.EventService().Subscribe(subCtx, eventFilters...)
@@ -353,34 +344,11 @@ func (c *Containerd) handleEvent(ctx context.Context, envelope events.Envelope, 
 		return c.handleImageUpsert(ctx, idx, e.GetName(), envelope)
 	case *eventtypes.ImageDelete:
 		return c.handleImageDelete(ctx, idx, e.GetName())
-	case *eventtypes.ContentCreate:
-		return c.handleContentCreate(ctx, idx, e.GetDigest())
 	case *eventtypes.ContentDelete:
 		return c.handleContentDelete(ctx, idx, e.GetDigest())
 	default:
 		return nil, fmt.Errorf("unsupported event type %T", evt)
 	}
-}
-
-func getContentPath(ctx context.Context, client *client.Client) (string, error) {
-	pluginInfo, err := client.IntrospectionService().PluginInfo(ctx, string(plugins.ContentPlugin), "content", nil)
-	if err != nil {
-		return "", err
-	}
-	root, ok := pluginInfo.Plugin.Exports["root"]
-	if !ok {
-		logr.FromContextOrDiscard(ctx).Info("falling back to reading content from socket as content path could not be found in plugin")
-		return "", nil
-	}
-	ok, err = dirExists(root)
-	if err != nil && !errors.Is(err, os.ErrPermission) {
-		return "", err
-	}
-	if !ok {
-		logr.FromContextOrDiscard(ctx).Info("falling back to reading content from socket as content path directory does not exist")
-		return "", nil
-	}
-	return root, nil
 }
 
 func (c *Containerd) handleImageUpsert(ctx context.Context, idx *Index, name string, envelope events.Envelope) ([]store.Event, error) {
@@ -421,24 +389,6 @@ func (c *Containerd) handleImageDelete(ctx context.Context, idx *Index, name str
 		return nil, err
 	}
 	return idx.RemoveImage(img), nil
-}
-
-func (c *Containerd) handleContentCreate(ctx context.Context, idx *Index, name string) ([]store.Event, error) {
-	dgst, err := digest.Parse(name)
-	if err != nil {
-		return nil, err
-	}
-	info, err := c.client.ContentStore().Info(ctx, dgst)
-	if errors.Is(err, errdefs.ErrNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if len(info.Labels) == 0 {
-		return nil, nil
-	}
-	return idx.AddContent(dgst), nil
 }
 
 func (c *Containerd) handleContentDelete(ctx context.Context, idx *Index, name string) ([]store.Event, error) {

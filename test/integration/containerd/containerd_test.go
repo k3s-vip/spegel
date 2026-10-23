@@ -12,8 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/containerd/containerd/v2/client"
-	ctrdclient "github.com/containerd/containerd/v2/client"
+	ctrdclient "github.com/containerd/containerd"
 	"github.com/containerd/errdefs"
 	"github.com/containerd/platforms"
 	"github.com/go-openapi/testify/v2/assert"
