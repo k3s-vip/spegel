@@ -6,8 +6,8 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Spegel Debug</title>
 	<link rel="icon" href="https://spegel.dev/favicon.svg" type="image/svg+xml">
-	<script src="https://unpkg.com/htmx.org@2.0.7"></script>
-	<script src="https://unpkg.com/htmx.org@2.0.7/dist/ext/response-targets.js"></script>
+	<script src="https://unpkg.com/htmx.org"></script>
+	<script src="https://unpkg.com/htmx.org/dist/ext/response-targets.js"></script>
 
 	<style>
 		body {
@@ -132,7 +132,7 @@
 		<div class="section-container">
 			<h2>Measure Image Pull</h2>
 			<form hx-get="/debug/web/measure" hx-target="#measure-result" hx-target-error="#measure-result">
-				<input type="text" name="image" placeholder="ghcr.io/spegel-org/spegel:v0.30.0" />
+				<input type="text" name="image" value="{{ .TagName }}" />
 				<button>Pull</button>
 			</form>
 			<div id="measure-result"></div>
